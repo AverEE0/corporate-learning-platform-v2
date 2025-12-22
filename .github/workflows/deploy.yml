@@ -29,56 +29,226 @@ jobs:
         run: |
           ssh $SSH_USER@$SSH_HOST << 'ENDSSH'
             set -e  # Exit on any error
-            echo "🚀 Starting deployment..."
             
-            # Переходим в директорию или клонируем репозиторий
+            # Функция для логирования с временной меткой
+            log() {
+              echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+            }
+            
+            # Функция для обработки ошибок
+            handle_error() {
+              local exit_code=$?
+              local line_number=$1
+              log "❌ ОШИБКА на строке $line_number (exit code: $exit_code)"
+              log "📋 Последние команды:"
+              history | tail -5 || true
+              log "📁 Текущая директория: $(pwd)"
+              log "🔍 Проверка окружения:"
+              log "   - Git: $(git --version 2>/dev/null || echo 'не установлен')"
+              log "   - Docker: $(docker --version 2>/dev/null || echo 'не установлен')"
+              log "   - Docker Compose: $(docker compose version 2>/dev/null || echo 'не установлен')"
+              log "   - Свободное место: $(df -h / | tail -1 | awk '{print $4}')"
+              exit $exit_code
+            }
+            
+            trap 'handle_error $LINENO' ERR
+            
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "🚀 НАЧАЛО ДЕПЛОЯ"
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "📋 Информация о сервере:"
+            log "   - Хост: $(hostname)"
+            log "   - Пользователь: $(whoami)"
+            log "   - Директория: $(pwd)"
+            log ""
+            
+            # Шаг 1: Проверка и переход в директорию проекта
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "ШАГ 1: Проверка директории проекта"
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             if [ ! -d "/root/corporate-learning-platform-v2" ]; then
-              echo "📦 Directory not found, cloning repository..."
-              cd /root
-              git clone https://github.com/AverEE0/corporate-learning-platform-v2.git
-            fi
-            
-            cd /root/corporate-learning-platform-v2
-            
-            # Проверяем и настраиваем git remote
-            if ! git remote get-url origin > /dev/null 2>&1; then
-              echo "📦 Setting up git remote..."
-              git remote add origin https://github.com/AverEE0/corporate-learning-platform-v2.git
-            else
-              echo "🔄 Updating git remote URL..."
-              git remote set-url origin https://github.com/AverEE0/corporate-learning-platform-v2.git
-            fi
-            
-            echo "📦 Fetching latest code..."
-            if ! git fetch origin; then
-              echo "⚠️ Git fetch failed, trying direct pull..."
-              if ! git pull origin main && ! git pull origin master; then
-                echo "❌ Failed to fetch/pull code!"
+              log "⚠️  Директория не найдена, клонируем репозиторий..."
+              cd /root || { log "❌ Не удалось перейти в /root"; exit 1; }
+              
+              log "📦 Клонирование репозитория..."
+              if git clone https://github.com/AverEE0/corporate-learning-platform-v2.git 2>&1; then
+                log "✅ Репозиторий успешно клонирован"
+              else
+                log "❌ Ошибка клонирования репозитория"
+                log "   Проверьте:"
+                log "   - Доступ к GitHub (репозиторий должен быть публичным или настроен доступ)"
+                log "   - Интернет соединение на сервере"
                 exit 1
               fi
             else
-              echo "🔄 Resetting to latest commit..."
-              if ! git reset --hard origin/main 2>/dev/null; then
-                if ! git reset --hard origin/master 2>/dev/null; then
-                  echo "⚠️ Reset failed, trying checkout..."
-                  git checkout -f main 2>/dev/null || git checkout -f master 2>/dev/null || true
-                fi
+              log "✅ Директория существует: /root/corporate-learning-platform-v2"
+            fi
+            
+            cd /root/corporate-learning-platform-v2 || { log "❌ Не удалось перейти в директорию проекта"; exit 1; }
+            log "📁 Текущая директория: $(pwd)"
+            log ""
+            
+            # Шаг 2: Настройка Git
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "ШАГ 2: Настройка Git"
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            # Проверка, что это git репозиторий
+            if [ ! -d ".git" ]; then
+              log "⚠️  Это не git репозиторий, инициализируем..."
+              if git init 2>&1; then
+                log "✅ Git репозиторий инициализирован"
+              else
+                log "❌ Ошибка инициализации git репозитория"
+                exit 1
               fi
             fi
             
-            echo "📝 Current commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
-            echo "🏗️ Building Docker containers..."
-            if ! docker compose build --no-cache app; then
-              echo "❌ Docker build failed!"
+            # Настройка remote
+            if ! git remote get-url origin > /dev/null 2>&1; then
+              log "📦 Добавление git remote..."
+              if git remote add origin https://github.com/AverEE0/corporate-learning-platform-v2.git 2>&1; then
+                log "✅ Remote добавлен"
+              else
+                log "❌ Ошибка добавления remote"
+                exit 1
+              fi
+            else
+              log "🔄 Обновление git remote URL..."
+              CURRENT_REMOTE=$(git remote get-url origin)
+              log "   Текущий remote: $CURRENT_REMOTE"
+              if git remote set-url origin https://github.com/AverEE0/corporate-learning-platform-v2.git 2>&1; then
+                log "✅ Remote URL обновлен"
+              else
+                log "⚠️  Не удалось обновить remote, продолжаем..."
+              fi
+            fi
+            
+            log "🔗 Проверка remote:"
+            git remote -v
+            log ""
+            
+            # Шаг 3: Получение кода
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "ШАГ 3: Получение кода из GitHub"
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            log "📦 Выполнение git fetch..."
+            if git fetch origin 2>&1; then
+              log "✅ Fetch выполнен успешно"
+              
+              log "🔄 Сброс на последний коммит..."
+              if git reset --hard origin/main 2>&1; then
+                log "✅ Сброс на origin/main выполнен"
+              elif git reset --hard origin/master 2>&1; then
+                log "✅ Сброс на origin/master выполнен"
+              else
+                log "⚠️  Сброс не удался, пробуем checkout..."
+                git checkout -f main 2>/dev/null || git checkout -f master 2>/dev/null || true
+                log "✅ Checkout выполнен"
+              fi
+            else
+              log "⚠️  Git fetch не удался, пробуем pull..."
+              if git pull origin main 2>&1; then
+                log "✅ Pull из origin/main выполнен"
+              elif git pull origin master 2>&1; then
+                log "✅ Pull из origin/master выполнен"
+              else
+                log "❌ Не удалось получить код из GitHub"
+                log "   Проверьте:"
+                log "   - Доступ к GitHub"
+                log "   - Правильность URL репозитория"
+                log "   - Состояние git репозитория:"
+                git status || true
+                exit 1
+              fi
+            fi
+            
+            CURRENT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')
+            CURRENT_MESSAGE=$(git log -1 --pretty=format:"%s" 2>/dev/null || echo 'unknown')
+            log "📝 Текущий коммит: $CURRENT_COMMIT"
+            log "📝 Сообщение коммита: $CURRENT_MESSAGE"
+            log ""
+            
+            # Шаг 4: Проверка Docker
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "ШАГ 4: Проверка Docker"
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            if ! command -v docker > /dev/null 2>&1; then
+              log "❌ Docker не установлен!"
+              log "   Установите Docker: apt-get update && apt-get install -y docker.io"
               exit 1
             fi
-            echo "🚀 Starting containers..."
-            if ! docker compose up -d app; then
-              echo "❌ Failed to start containers!"
+            log "✅ Docker установлен: $(docker --version)"
+            
+            if ! command -v docker-compose > /dev/null 2>&1 && ! docker compose version > /dev/null 2>&1; then
+              log "❌ Docker Compose не установлен!"
+              log "   Установите: apt-get install -y docker-compose-plugin"
               exit 1
             fi
-            echo "✅ Checking container status..."
+            log "✅ Docker Compose установлен: $(docker compose version 2>/dev/null || docker-compose --version)"
+            
+            # Проверка свободного места
+            AVAILABLE_SPACE=$(df -h / | tail -1 | awk '{print $4}')
+            log "💾 Свободное место: $AVAILABLE_SPACE"
+            log ""
+            
+            # Шаг 5: Сборка Docker контейнеров
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "ШАГ 5: Сборка Docker контейнеров"
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            log "🏗️  Запуск docker compose build..."
+            if docker compose build --no-cache app 2>&1; then
+              log "✅ Сборка завершена успешно"
+            else
+              log "❌ Ошибка сборки Docker контейнера"
+              log "   Проверьте:"
+              log "   - docker-compose.yml файл"
+              log "   - Dockerfile"
+              log "   - Логи Docker: docker compose logs"
+              log "   - Состояние: docker compose ps -a"
+              exit 1
+            fi
+            log ""
+            
+            # Шаг 6: Запуск контейнеров
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "ШАГ 6: Запуск контейнеров"
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            log "🚀 Запуск docker compose up..."
+            if docker compose up -d app 2>&1; then
+              log "✅ Контейнеры запущены"
+            else
+              log "❌ Ошибка запуска контейнеров"
+              log "   Проверьте логи: docker compose logs app"
+              log "   Проверьте состояние: docker compose ps"
+              exit 1
+            fi
+            log ""
+            
+            # Шаг 7: Проверка статуса
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "ШАГ 7: Проверка статуса"
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            log "⏳ Ожидание запуска контейнеров (5 секунд)..."
             sleep 5
-            docker compose ps
-            echo "✅ Deployment completed successfully!"
+            
+            log "📊 Статус контейнеров:"
+            docker compose ps 2>&1 || true
+            
+            log ""
+            log "📋 Последние логи приложения:"
+            docker compose logs --tail=20 app 2>&1 || true
+            
+            log ""
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "✅ ДЕПЛОЙ ЗАВЕРШЕН УСПЕШНО!"
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log "📝 Коммит: $CURRENT_COMMIT"
+            log "📅 Время: $(date)"
+            log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           ENDSSH

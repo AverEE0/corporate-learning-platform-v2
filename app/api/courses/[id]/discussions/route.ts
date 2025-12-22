@@ -35,16 +35,28 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = (page - 1) * limit
 
-    let orderBy = 'd.created_at DESC'
+    // Безопасная сортировка (избегаем SQL injection)
+    let orderByClause = 'd.created_at DESC'
     if (sort === 'popular') {
-      orderBy = 'd.replies_count DESC, d.views_count DESC'
+      orderByClause = 'd.replies_count DESC, d.views_count DESC, d.created_at DESC'
     } else if (sort === 'pinned') {
-      orderBy = 'd.is_pinned DESC, d.created_at DESC'
+      orderByClause = 'd.is_pinned DESC, d.created_at DESC'
     }
 
     const query = `
       SELECT 
-        d.*,
+        d.id,
+        d.course_id,
+        d.user_id,
+        d.title,
+        d.content,
+        d.is_pinned,
+        d.is_locked,
+        d.views_count,
+        d.replies_count,
+        d.last_reply_at,
+        d.created_at,
+        d.updated_at,
         u.first_name,
         u.last_name,
         u.email,
@@ -53,8 +65,11 @@ export async function GET(
       JOIN users u ON d.user_id = u.id
       LEFT JOIN discussion_likes l ON l.discussion_id = d.id
       WHERE d.course_id = $1
-      GROUP BY d.id, u.first_name, u.last_name, u.email
-      ORDER BY ${orderBy}
+      GROUP BY 
+        d.id, d.course_id, d.user_id, d.title, d.content, d.is_pinned, 
+        d.is_locked, d.views_count, d.replies_count, d.last_reply_at, 
+        d.created_at, d.updated_at, u.first_name, u.last_name, u.email
+      ORDER BY ${orderByClause}
       LIMIT $2 OFFSET $3
     `
 

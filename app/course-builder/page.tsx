@@ -62,7 +62,9 @@ function CourseBuilderContent() {
   const [courseId, setCourseId] = useState<number | null>(null)
   const [loadingCourse, setLoadingCourse] = useState(false)
   const [courseLoaded, setCourseLoaded] = useState(false)
+  const [lastLoadedCourseId, setLastLoadedCourseId] = useState<number | null>(null)
 
+  // Проверка авторизации
   useEffect(() => {
     if (authLoading) return
     
@@ -70,18 +72,28 @@ function CourseBuilderContent() {
       router.push('/dashboard')
       return
     }
+  }, [user, router, authLoading])
 
-    // Загружаем курс для редактирования, если есть courseId в URL
+  // Загрузка курса при изменении courseId в URL
+  useEffect(() => {
+    if (authLoading) return
+    if (!user || (user.role !== 'admin' && user.role !== 'manager')) return
+
+    // Получаем courseId из URL
     const courseIdParam = searchParams.get('courseId')
+    
     if (courseIdParam && !isNaN(parseInt(courseIdParam))) {
       const id = parseInt(courseIdParam)
-      // Загружаем только если курс еще не загружен или ID изменился
-      if (!courseLoaded || courseId !== id) {
+      
+      // Загружаем только если это новый курс (ID изменился)
+      if (lastLoadedCourseId !== id) {
+        console.log('Course ID changed in URL, loading course:', id)
         loadCourse(id)
       }
     } else {
-      // Если courseId нет в URL, сбрасываем состояние
-      if (courseLoaded) {
+      // Если courseId нет в URL, сбрасываем состояние (только если был загружен курс)
+      if (lastLoadedCourseId !== null) {
+        console.log('No courseId in URL, resetting state')
         setCourseId(null)
         setCourseTitle("")
         setCourseDescription("")
@@ -89,13 +101,15 @@ function CourseBuilderContent() {
         setLessons([])
         setSelectedLesson(null)
         setCourseLoaded(false)
+        setLastLoadedCourseId(null)
       }
     }
-  }, [user, router, authLoading, searchParams, courseLoaded, courseId])
+  }, [searchParams, user, authLoading, lastLoadedCourseId])
 
   async function loadCourse(id: number) {
     // Предотвращаем повторную загрузку того же курса
-    if (courseId === id && courseLoaded) {
+    if (lastLoadedCourseId === id && courseLoaded) {
+      console.log('Course already loaded, skipping:', id)
       return
     }
 
@@ -111,6 +125,7 @@ function CourseBuilderContent() {
         const errorData = await response.json().catch(() => ({}))
         console.error('Failed to load course:', errorData)
         toast.error(errorData.error || 'Ошибка загрузки курса')
+        setLastLoadedCourseId(null)
         return
       }
 
@@ -162,14 +177,17 @@ function CourseBuilderContent() {
           setSelectedLesson(loadedLessons[0].id)
         }
         setCourseLoaded(true)
+        setLastLoadedCourseId(id)
         toast.success('Курс загружен для редактирования')
       } else {
         console.error('Invalid course data:', data)
         toast.error('Не удалось загрузить данные курса')
+        setLastLoadedCourseId(null)
       }
     } catch (error: any) {
       console.error('Error loading course:', error)
       toast.error('Ошибка загрузки курса: ' + (error.message || 'Неизвестная ошибка'))
+      setLastLoadedCourseId(null)
     } finally {
       setLoadingCourse(false)
     }

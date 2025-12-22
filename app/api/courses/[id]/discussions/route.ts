@@ -92,6 +92,21 @@ export async function GET(
     })
   } catch (error: any) {
     console.error('Error fetching discussions:', error)
+    
+    // Если таблица не существует, возвращаем пустой список
+    if (error?.message?.includes('does not exist') || error?.code === '42P01') {
+      return NextResponse.json({
+        success: true,
+        discussions: [],
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: 0,
+          totalPages: 0,
+        },
+      })
+    }
+    
     return NextResponse.json(
       { success: false, error: error.message || 'Ошибка загрузки обсуждений' },
       { status: 500 }
@@ -157,6 +172,15 @@ export async function POST(
     })
   } catch (error: any) {
     console.error('Error creating discussion:', error)
+    
+    // Если таблица не существует, возвращаем ошибку
+    if (error?.message?.includes('does not exist') || error?.code === '42P01') {
+      return NextResponse.json(
+        { success: false, error: 'Функция обсуждений не настроена. Выполните миграцию базы данных.' },
+        { status: 503 }
+      )
+    }
+    
     return NextResponse.json(
       { success: false, error: error.message || 'Ошибка создания обсуждения' },
       { status: 500 }

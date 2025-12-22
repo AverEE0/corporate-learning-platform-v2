@@ -64,8 +64,9 @@ export async function GET(
         )
       }
       
-      // Если пользователь - менеджер, проверяем, что это его курс или он админ
-      if (user.role === 'manager' && course.created_by !== user.id && user.role !== 'admin') {
+      // Если пользователь - менеджер, проверяем, что это его курс
+      // Админы могут видеть все черновики
+      if (user.role === 'manager' && course.created_by !== user.id) {
         return NextResponse.json(
           { success: false, error: 'Курс недоступен' },
           { status: 403 }

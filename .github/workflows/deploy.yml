@@ -21,13 +21,19 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          echo "✅ SSH ключ настроен"
+          echo "🔍 Проверка SSH подключения..."
+          ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo 'SSH connection successful'" || {
+            echo "❌ Ошибка SSH подключения"
+            exit 1
+          }
       
       - name: Deploy to server
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
         run: |
-          ssh $SSH_USER@$SSH_HOST << 'ENDSSH'
+          ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 $SSH_USER@$SSH_HOST << 'ENDSSH'
             set -e  # Exit on any error
             
             # Функция для логирования с временной меткой

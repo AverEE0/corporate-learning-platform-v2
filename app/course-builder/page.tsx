@@ -64,6 +64,14 @@ function CourseBuilderContent() {
   const [courseLoaded, setCourseLoaded] = useState(false)
   const [lastLoadedCourseId, setLastLoadedCourseId] = useState<number | null>(null)
 
+  // Функция для получения courseId из URL
+  const getCourseIdFromURL = () => {
+    if (typeof window === 'undefined') return null
+    const params = new URLSearchParams(window.location.search)
+    const courseIdParam = params.get('courseId')
+    return courseIdParam && !isNaN(parseInt(courseIdParam)) ? parseInt(courseIdParam) : null
+  }
+
   // Проверка авторизации
   useEffect(() => {
     if (authLoading) return
@@ -74,25 +82,28 @@ function CourseBuilderContent() {
     }
   }, [user, router, authLoading])
 
-  // Загрузка курса при изменении courseId в URL
+  // Проверка courseId при монтировании и при изменении URL
   useEffect(() => {
     if (authLoading) return
     if (!user || (user.role !== 'admin' && user.role !== 'manager')) return
 
-    // Получаем courseId из URL
-    const courseIdParam = searchParams.get('courseId')
-    
-    if (courseIdParam && !isNaN(parseInt(courseIdParam))) {
-      const id = parseInt(courseIdParam)
+    const checkAndLoadCourse = () => {
+      const id = getCourseIdFromURL()
+      const courseIdFromParams = searchParams.get('courseId')
+      const finalId = id || (courseIdFromParams && !isNaN(parseInt(courseIdFromParams)) ? parseInt(courseIdFromParams) : null)
       
-      // Загружаем только если это новый курс (ID изменился)
-      if (lastLoadedCourseId !== id) {
-        console.log('Course ID changed in URL, loading course:', id)
-        loadCourse(id)
-      }
-    } else {
-      // Если courseId нет в URL, сбрасываем состояние (только если был загружен курс)
-      if (lastLoadedCourseId !== null) {
+      console.log('Checking courseId on mount/URL change:', {
+        fromWindow: id,
+        fromSearchParams: courseIdFromParams,
+        final: finalId,
+        lastLoaded: lastLoadedCourseId,
+        courseLoaded: courseLoaded
+      })
+      
+      if (finalId && finalId !== lastLoadedCourseId) {
+        console.log('Loading course from URL:', finalId)
+        loadCourse(finalId)
+      } else if (!finalId && lastLoadedCourseId !== null && courseLoaded) {
         console.log('No courseId in URL, resetting state')
         setCourseId(null)
         setCourseTitle("")
@@ -104,7 +115,30 @@ function CourseBuilderContent() {
         setLastLoadedCourseId(null)
       }
     }
-  }, [searchParams, user, authLoading, lastLoadedCourseId])
+
+    // Проверяем сразу при монтировании и при изменении зависимостей
+    checkAndLoadCourse()
+
+    // Слушаем изменения URL через popstate (для кнопки назад/вперед)
+    const handleLocationChange = () => {
+      setTimeout(checkAndLoadCourse, 100)
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('popstate', handleLocationChange)
+      
+      // Также слушаем изменения через hashchange (на случай если используется hash)
+      window.addEventListener('hashchange', handleLocationChange)
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('popstate', handleLocationChange)
+        window.removeEventListener('hashchange', handleLocationChange)
+      }
+    }
+  }, [user, authLoading, searchParams, lastLoadedCourseId, courseLoaded])
+
 
   async function loadCourse(id: number) {
     // Предотвращаем повторную загрузку того же курса

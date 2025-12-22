@@ -60,10 +60,14 @@ export default function ManagerDashboardPage() {
         const coursesData = await coursesResponse.json()
         if (coursesData.success && coursesData.courses) {
           setCourses(Array.isArray(coursesData.courses) ? coursesData.courses : [])
+        } else {
+          console.error('Error loading courses: Invalid response format', coursesData)
+          toast.error('Ошибка загрузки курсов')
         }
       } else {
         const errorData = await coursesResponse.json().catch(() => ({}))
-        console.error('Error loading courses:', errorData.error || 'Unknown error')
+        console.error('Error loading courses:', errorData.error || 'Unknown error', 'Status:', coursesResponse.status)
+        toast.error(`Ошибка загрузки курсов: ${errorData.error || 'Неизвестная ошибка'}`)
       }
 
       // Загружаем студентов

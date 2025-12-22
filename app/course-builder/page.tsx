@@ -61,6 +61,7 @@ function CourseBuilderContent() {
   const [uploading, setUploading] = useState<{ [key: string]: boolean }>({})
   const [courseId, setCourseId] = useState<number | null>(null)
   const [loadingCourse, setLoadingCourse] = useState(false)
+  const [courseLoaded, setCourseLoaded] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -73,20 +74,49 @@ function CourseBuilderContent() {
     // Загружаем курс для редактирования, если есть courseId в URL
     const courseIdParam = searchParams.get('courseId')
     if (courseIdParam && !isNaN(parseInt(courseIdParam))) {
-      loadCourse(parseInt(courseIdParam))
+      const id = parseInt(courseIdParam)
+      // Загружаем только если курс еще не загружен или ID изменился
+      if (!courseLoaded || courseId !== id) {
+        loadCourse(id)
+      }
+    } else {
+      // Если courseId нет в URL, сбрасываем состояние
+      if (courseLoaded) {
+        setCourseId(null)
+        setCourseTitle("")
+        setCourseDescription("")
+        setCourseStatus("draft")
+        setLessons([])
+        setSelectedLesson(null)
+        setCourseLoaded(false)
+      }
     }
-  }, [user, router, authLoading, searchParams])
+  }, [user, router, authLoading, searchParams, courseLoaded, courseId])
 
   async function loadCourse(id: number) {
+    // Предотвращаем повторную загрузку того же курса
+    if (courseId === id && courseLoaded) {
+      return
+    }
+
     setLoadingCourse(true)
+    setCourseLoaded(false)
     try {
-      const response = await fetch(`/api/courses/${id}`)
+      console.log('Loading course:', id)
+      const response = await fetch(`/api/courses/${id}`, {
+        credentials: 'include',
+      })
+      
       if (!response.ok) {
-        toast.error('Ошибка загрузки курса')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Failed to load course:', errorData)
+        toast.error(errorData.error || 'Ошибка загрузки курса')
         return
       }
 
       const data = await response.json()
+      console.log('Course data loaded:', data)
+      
       if (data.success && data.course) {
         setCourseId(data.course.id)
         setCourseTitle(data.course.title || "")
@@ -126,15 +156,20 @@ function CourseBuilderContent() {
           }),
         }))
 
+        console.log('Loaded lessons:', loadedLessons)
         setLessons(loadedLessons)
         if (loadedLessons.length > 0) {
           setSelectedLesson(loadedLessons[0].id)
         }
+        setCourseLoaded(true)
         toast.success('Курс загружен для редактирования')
+      } else {
+        console.error('Invalid course data:', data)
+        toast.error('Не удалось загрузить данные курса')
       }
     } catch (error: any) {
       console.error('Error loading course:', error)
-      toast.error('Ошибка загрузки курса')
+      toast.error('Ошибка загрузки курса: ' + (error.message || 'Неизвестная ошибка'))
     } finally {
       setLoadingCourse(false)
     }
@@ -718,11 +753,21 @@ function CourseBuilderContent() {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Sidebar - Course Info & Lessons */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Course Info */}
-            <Card className="gradient-card border-0 shadow-lg">
+        {loadingCourse ? (
+          <Card className="gradient-card border-0 shadow-lg">
+            <CardContent className="py-12 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                <p className="text-muted-foreground">Загрузка курса...</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Left Sidebar - Course Info & Lessons */}
+            <div className="lg:col-span-1 space-y-6">
+              {/* Course Info */}
+              <Card className="gradient-card border-0 shadow-lg">
               <CardHeader>
                 <CardTitle>Информация о курсе</CardTitle>
               </CardHeader>
@@ -1622,6 +1667,7 @@ function CourseBuilderContent() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       <CoursePreviewModal

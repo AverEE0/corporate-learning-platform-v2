@@ -65,6 +65,7 @@ export function DiscussionsList({ courseId }: DiscussionsListProps) {
 
   useEffect(() => {
     loadDiscussions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, sort])
 
   const loadDiscussions = async () => {
@@ -301,6 +302,7 @@ function DiscussionCard({ discussion, onLike }: DiscussionCardProps) {
     if (expanded) {
       loadReplies()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded])
 
   const handleSendReply = async () => {

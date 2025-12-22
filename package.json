@@ -51,6 +51,8 @@
     "@tiptap/react": "^2.3.0",
     "@tiptap/starter-kit": "^2.3.0",
     "@tiptap/extension-image": "^2.3.0",
+    "@tiptap/extension-link": "^2.3.0",
+    "@tiptap/extension-underline": "^2.3.0",
     "recharts": "latest",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.5.5",

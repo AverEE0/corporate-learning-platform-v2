@@ -77,47 +77,50 @@ export async function GET(
       INNER JOIN blocks b ON up.block_id = b.id
       WHERE up.course_id = $1
         AND b.type = 'quiz'
-        AND (
-          (b.content::jsonb->>'questionType')::text IN ('text', 'audio', 'video')
-          OR up.answers IS NOT NULL
-        )
+        AND up.answers IS NOT NULL
       ORDER BY up.updated_at DESC, u.last_name, u.first_name
     `
 
     const results = await executeQuery(query, [courseId])
     const answers = Array.isArray(results) ? results : [results]
 
-    // Парсим JSONB поля
-    const parsedAnswers = answers.map((item: any) => {
-      let blockContent = {}
-      let answersObj = {}
+    // Парсим JSONB поля и фильтруем только text/audio/video ответы
+    const parsedAnswers = answers
+      .map((item: any) => {
+        let blockContent = {}
+        let answersObj = {}
 
-      try {
-        if (item.block_content) {
-          blockContent = typeof item.block_content === 'string'
-            ? JSON.parse(item.block_content)
-            : item.block_content
+        try {
+          if (item.block_content) {
+            blockContent = typeof item.block_content === 'string'
+              ? JSON.parse(item.block_content)
+              : item.block_content
+          }
+        } catch (e) {
+          console.error('Error parsing block_content:', e)
         }
-      } catch (e) {
-        console.error('Error parsing block_content:', e)
-      }
 
-      try {
-        if (item.answers) {
-          answersObj = typeof item.answers === 'string'
-            ? JSON.parse(item.answers)
-            : item.answers
+        try {
+          if (item.answers) {
+            answersObj = typeof item.answers === 'string'
+              ? JSON.parse(item.answers)
+              : item.answers
+          }
+        } catch (e) {
+          console.error('Error parsing answers:', e)
         }
-      } catch (e) {
-        console.error('Error parsing answers:', e)
-      }
 
-      return {
-        ...item,
-        block_content: blockContent,
-        answers: answersObj,
-      }
-    })
+        return {
+          ...item,
+          block_content: blockContent,
+          answers: answersObj,
+        }
+      })
+      .filter((item: any) => {
+        // Фильтруем только вопросы с типами text/audio/video
+        const questionType = item.block_content?.questionType
+        return questionType === 'text' || questionType === 'audio' || questionType === 'video'
+      })
 
     return NextResponse.json({
       success: true,

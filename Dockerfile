@@ -10,8 +10,8 @@ RUN apk add --no-cache libc6-compat python3 make g++
 COPY package.json package-lock.json* ./
 
 # Install dependencies (кэш npm слоя переиспользуется если package.json не изменился)
-# npm ci быстрее и надежнее для production, требует синхронизированный package-lock.json
-RUN npm ci --legacy-peer-deps --no-audit && \
+# Используем npm install с --legacy-peer-deps для совместимости с конфликтующими peer dependencies
+RUN npm install --legacy-peer-deps --no-audit && \
     npm install react-is --legacy-peer-deps --no-audit || true
 
 # Copy source code (копируется последним для лучшего кэширования)

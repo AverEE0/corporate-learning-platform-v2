@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { 
   Users, BookOpen, TrendingUp, Award, Plus, 
-  Eye, Edit, LogOut, BarChart3, Clock, Download, MessageSquare, Trash2
+  Eye, Edit, LogOut, BarChart3, Clock, Download, MessageSquare, Trash2, CheckCircle2
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { toast } from "sonner"
@@ -403,6 +403,14 @@ export default function ManagerDashboardPage() {
                           title="Аналитика курса"
                         >
                           <BarChart3 className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => router.push(`/manager/courses/${course.id}/review`)}
+                          title="Проверить ответы студентов"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="ghost" 

@@ -20,6 +20,7 @@ import { SearchInput } from "@/components/ui/search-input"
 import { ExportPDFButton } from "@/components/export-pdf-button"
 import { NotificationsBell } from "@/components/notifications/notifications-bell"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 
 export default function ManagerDashboardPage() {
   const router = useRouter()
@@ -28,6 +29,8 @@ export default function ManagerDashboardPage() {
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [courseToDelete, setCourseToDelete] = useState<{ id: number; title: string } | null>(null)
 
   useEffect(() => {
     if (authLoading) {
@@ -96,13 +99,16 @@ export default function ManagerDashboardPage() {
     student.email?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleDeleteCourse = async (courseId: number, courseTitle: string) => {
-    if (!confirm(`Вы уверены, что хотите удалить курс "${courseTitle}"? Это действие нельзя отменить.`)) {
-      return
-    }
+  const handleDeleteCourse = (courseId: number, courseTitle: string) => {
+    setCourseToDelete({ id: courseId, title: courseTitle })
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDeleteCourse = async () => {
+    if (!courseToDelete) return
 
     try {
-      const response = await fetch(`/api/courses/${courseId}`, {
+      const response = await fetch(`/api/courses/${courseToDelete.id}`, {
         method: 'DELETE',
         credentials: 'include',
       })
@@ -119,6 +125,9 @@ export default function ManagerDashboardPage() {
     } catch (error: any) {
       console.error('Error deleting course:', error)
       toast.error('Ошибка удаления курса')
+    } finally {
+      setDeleteDialogOpen(false)
+      setCourseToDelete(null)
     }
   }
 
@@ -563,6 +572,18 @@ export default function ManagerDashboardPage() {
           </Card>
         </div>
       </div>
+
+      {/* Delete Course Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDeleteCourse}
+        title="Удалить курс"
+        description={`Вы уверены, что хотите удалить курс "${courseToDelete?.title || ''}"? Это действие нельзя отменить.`}
+        confirmText="Удалить"
+        cancelText="Отмена"
+        variant="destructive"
+      />
     </div>
   )
 }

@@ -1,0 +1,34 @@
+# Команды для выполнения на сервере через plink/SSH
+# Использование: plink -ssh root@212.113.123.94 -pw "wNaqg6r+wRUDV?" < команды ниже
+
+# 1. Перейти в директорию проекта (замените путь на ваш)
+cd /путь/к/project
+
+# 2. Проверить наличие Node.js
+node --version
+npm --version
+
+# 3. Установить зависимости
+npm install
+
+# 4. Создать .env.local (скопировать из .env.example или создать вручную)
+cp .env.example .env.local
+# Затем отредактировать .env.local через nano/vim:
+# nano .env.local
+
+# 5. Создать необходимые директории
+mkdir -p uploads
+mkdir -p logs
+
+# 6. Дать права на выполнение скрипту настройки
+chmod +x setup-server.sh
+
+# 7. Запустить скрипт настройки
+./setup-server.sh
+
+# 8. После настройки .env.local, собрать проект
+npm run build
+
+# 9. Запустить проект
+npm start
+

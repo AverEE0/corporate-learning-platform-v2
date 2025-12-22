@@ -1,0 +1,37 @@
+# Database Configuration
+# Для Docker с PostgreSQL контейнером используйте: postgresql://postgres:password@postgres:5432/learning_platform
+# Для локальной разработки: postgresql://postgres:password@localhost:5432/learning_platform
+DATABASE_URL=postgresql://postgres:password@postgres:5432/learning_platform
+
+# JWT Secret - сгенерируйте безопасный случайный ключ
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+
+# Application URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Upload Directory (внутри контейнера)
+UPLOAD_DIR=/app/uploads
+
+# Node Environment
+NODE_ENV=production
+
+# Port (для Next.js внутри контейнера)
+PORT=3000
+
+# Optional: Telegram Bot Integration
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+
+# Optional: Bitrix24 Integration
+BITRIX24_WEBHOOK_URL=
+
+# Optional: Email Configuration (SMTP)
+EMAIL_SMTP_HOST=
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_USER=
+EMAIL_SMTP_PASSWORD=
+EMAIL_FROM_ADDRESS=
+
+# Optional: Redis URL (если используется)
+REDIS_URL=
+

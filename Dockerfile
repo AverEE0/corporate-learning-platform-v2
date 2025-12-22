@@ -3,16 +3,18 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies
+# Install build dependencies (кэшируется отдельным слоем)
 RUN apk add --no-cache libc6-compat python3 make g++
 
-# Copy package files
+# Copy package files (кэшируется отдельным слоем для ускорения)
 COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps && npm install react-is --legacy-peer-deps
+# Install dependencies (кэш npm слоя переиспользуется если package.json не изменился)
+# npm ci быстрее чем npm install и более надежен для production
+RUN npm ci --legacy-peer-deps --no-audit && \
+    npm install react-is --legacy-peer-deps --no-audit || true
 
-# Copy source code
+# Copy source code (копируется последним для лучшего кэширования)
 COPY . .
 
 # Build the application

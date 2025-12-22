@@ -23,7 +23,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const courses = await courseDb.getCoursesByManager(user.id)
+    // Админы видят все курсы, менеджеры - все курсы (но могут удалять только свои)
+    const courses = user.role === 'admin' 
+      ? await courseDb.getAllCourses()
+      : await courseDb.getAllCourses()
 
     return NextResponse.json({
       success: true,

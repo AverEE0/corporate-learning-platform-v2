@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/auth-context"
 import { toast } from "sonner"
 import Link from "next/link"
 import { Skeleton } from "@/components/ui/skeleton"
+import { getCSRFToken } from "@/lib/csrf-client"
 
 interface StudentAnswer {
   progress_id: number
@@ -100,7 +101,7 @@ export default function ReviewAnswersPage() {
     setGrading(prev => ({ ...prev, [progressId]: true }))
 
     try {
-      const csrfToken = await fetch('/api/csrf-token').then(r => r.json()).then(d => d.token).catch(() => '')
+      const csrfToken = await getCSRFToken()
 
       const response = await fetch(`/api/manager/progress/${progressId}/grade`, {
         method: 'PUT',

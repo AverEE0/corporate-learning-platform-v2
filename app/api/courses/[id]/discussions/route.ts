@@ -36,11 +36,17 @@ export async function GET(
     const offset = (page - 1) * limit
 
     // Безопасная сортировка (избегаем SQL injection)
+    // Безопасная сортировка (избегаем SQL injection)
     let orderByClause = 'd.created_at DESC'
     if (sort === 'popular') {
       orderByClause = 'd.replies_count DESC, d.views_count DESC, d.created_at DESC'
     } else if (sort === 'pinned') {
       orderByClause = 'd.is_pinned DESC, d.created_at DESC'
+    }
+    // Дополнительная проверка безопасности
+    const allowedSorts = ['d.created_at DESC', 'd.replies_count DESC, d.views_count DESC, d.created_at DESC', 'd.is_pinned DESC, d.created_at DESC']
+    if (!allowedSorts.includes(orderByClause)) {
+      orderByClause = 'd.created_at DESC'
     }
 
     const query = `

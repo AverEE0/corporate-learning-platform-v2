@@ -478,8 +478,13 @@ export default function ManagerDashboardPage() {
           {/* Students */}
           <Card className="gradient-card border-0 shadow-lg">
             <CardHeader>
-              <CardTitle>Студенты</CardTitle>
-              <CardDescription>Список всех студентов</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-2xl">🎓</span>
+                Студенты
+              </CardTitle>
+              <CardDescription className="flex items-center gap-2">
+                📚 Список всех студентов
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {loading ? (

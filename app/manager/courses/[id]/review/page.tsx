@@ -21,6 +21,9 @@ import { getCSRFToken } from "@/lib/csrf-client"
 interface StudentAnswer {
   progress_id: number
   user_id: number
+  course_id: number
+  lesson_id: number
+  block_id: number
   first_name: string
   last_name: string
   email: string

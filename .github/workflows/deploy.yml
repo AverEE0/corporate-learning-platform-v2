@@ -33,12 +33,12 @@ jobs:
           }
       
       - name: Deploy to server
-        timeout-minutes: 18  # Таймаут для SSH сессии
+        timeout-minutes: 13  # Таймаут для SSH сессии (меньше чем job timeout)
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
         run: |
-          ssh -o ConnectTimeout=10 -o ServerAliveInterval=30 -o ServerAliveCountMax=2 $SSH_USER@$SSH_HOST << 'ENDSSH'
+          ssh -o ConnectTimeout=5 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 -o BatchMode=yes $SSH_USER@$SSH_HOST << 'ENDSSH'
             set -e  # Exit on any error
             
             # Функция для логирования с временной меткой

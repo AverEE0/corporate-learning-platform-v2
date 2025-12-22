@@ -10,6 +10,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20  # Максимальное время выполнения всего job
     concurrency:
       group: deploy
       cancel-in-progress: false  # Не отменять текущий деплой, если запущен новый
@@ -218,11 +219,11 @@ jobs:
             log "   Используем кэш Docker для ускорения сборки"
             log "   Если нужна чистая сборка, используйте --no-cache вручную"
             
-            # Сборка с таймаутом (максимум 15 минут)
-            timeout 900 docker compose build app 2>&1 || {
+            # Сборка с таймаутом (максимум 10 минут для безопасности)
+            timeout 600 docker compose build app 2>&1 || {
               BUILD_EXIT_CODE=$?
               if [ $BUILD_EXIT_CODE -eq 124 ]; then
-                log "❌ Таймаут сборки Docker контейнера (превышен лимит 15 минут)"
+                log "❌ Таймаут сборки Docker контейнера (превышен лимит 10 минут)"
               else
                 log "❌ Ошибка сборки Docker контейнера (код выхода: $BUILD_EXIT_CODE)"
               fi

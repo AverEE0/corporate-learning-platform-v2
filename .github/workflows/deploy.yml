@@ -30,22 +30,53 @@ jobs:
           ssh $SSH_USER@$SSH_HOST << 'ENDSSH'
             set -e  # Exit on any error
             echo "🚀 Starting deployment..."
+            
+            # Переходим в директорию или клонируем репозиторий
+            if [ ! -d "/root/corporate-learning-platform-v2" ]; then
+              echo "📦 Directory not found, cloning repository..."
+              cd /root
+              git clone https://github.com/AverEE0/corporate-learning-platform-v2.git
+            fi
+            
             cd /root/corporate-learning-platform-v2
+            
+            # Проверяем и настраиваем git remote
+            if ! git remote get-url origin > /dev/null 2>&1; then
+              echo "📦 Setting up git remote..."
+              git remote add origin https://github.com/AverEE0/corporate-learning-platform-v2.git
+            else
+              echo "🔄 Updating git remote URL..."
+              git remote set-url origin https://github.com/AverEE0/corporate-learning-platform-v2.git
+            fi
+            
             echo "📦 Fetching latest code..."
-            git fetch origin
-            echo "🔄 Resetting to latest commit..."
-            git reset --hard origin/main || git reset --hard origin/master
-            echo "📝 Current commit: $(git rev-parse --short HEAD)"
+            if ! git fetch origin; then
+              echo "⚠️ Git fetch failed, trying direct pull..."
+              if ! git pull origin main && ! git pull origin master; then
+                echo "❌ Failed to fetch/pull code!"
+                exit 1
+              fi
+            else
+              echo "🔄 Resetting to latest commit..."
+              if ! git reset --hard origin/main 2>/dev/null; then
+                if ! git reset --hard origin/master 2>/dev/null; then
+                  echo "⚠️ Reset failed, trying checkout..."
+                  git checkout -f main 2>/dev/null || git checkout -f master 2>/dev/null || true
+                fi
+              fi
+            fi
+            
+            echo "📝 Current commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
             echo "🏗️ Building Docker containers..."
-            docker compose build --no-cache app || {
+            if ! docker compose build --no-cache app; then
               echo "❌ Docker build failed!"
               exit 1
-            }
+            fi
             echo "🚀 Starting containers..."
-            docker compose up -d app || {
+            if ! docker compose up -d app; then
               echo "❌ Failed to start containers!"
               exit 1
-            }
+            fi
             echo "✅ Checking container status..."
             sleep 5
             docker compose ps

@@ -24,8 +24,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Студенты видят только опубликованные курсы
+    // Менеджеры и админы видят все курсы
+    const statusFilter = user.role === 'student' ? "WHERE status = 'published'" : ""
     const courses = await executeQuery(
-      'SELECT * FROM courses ORDER BY created_at DESC'
+      `SELECT * FROM courses ${statusFilter} ORDER BY created_at DESC`
     )
 
     return NextResponse.json({

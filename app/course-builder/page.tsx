@@ -854,6 +854,16 @@ function CourseBuilderContent() {
                       <SelectItem value="published">Опубликован</SelectItem>
                     </SelectContent>
                   </Select>
+                  {courseStatus === "draft" && (
+                    <p className="text-xs text-muted-foreground">
+                      💡 Черновик виден только вам. Студенты его не увидят до публикации.
+                    </p>
+                  )}
+                  {courseStatus === "published" && (
+                    <p className="text-xs text-muted-foreground">
+                      ✅ Курс будет виден всем студентам после сохранения.
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

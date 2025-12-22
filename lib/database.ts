@@ -153,7 +153,8 @@ export const courseDb = {
     return executeQuery(query, [managerId])
   },
 
-  async getAllCourses() {
+  async getAllCourses(onlyPublished: boolean = false) {
+    const statusFilter = onlyPublished ? "WHERE c.status = 'published'" : ""
     const query = `
       SELECT c.*, 
         COUNT(DISTINCT l.id) as lesson_count,
@@ -161,10 +162,15 @@ export const courseDb = {
       FROM courses c
       LEFT JOIN lessons l ON c.id = l.course_id
       LEFT JOIN course_enrollments ce ON c.id = ce.course_id
+      ${statusFilter}
       GROUP BY c.id
       ORDER BY c.created_at DESC
     `
     return executeQuery(query)
+  },
+
+  async getPublishedCourses() {
+    return this.getAllCourses(true)
   },
 }
 

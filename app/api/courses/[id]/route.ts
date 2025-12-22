@@ -19,6 +19,17 @@ export async function GET(
 
     const courseId = parseInt(id)
 
+    // Проверяем авторизацию для проверки роли пользователя
+    const token = (await cookies()).get('auth-token')?.value
+    let user = null
+    if (token) {
+      try {
+        user = verifyToken(token)
+      } catch (error) {
+        // Не критично, если токен невалиден - просто не проверяем роль
+      }
+    }
+
     // Получаем курс
     const courseQuery = `SELECT * FROM courses WHERE id = $1`
     const courseResult = await executeQuery(courseQuery, [courseId])
@@ -31,6 +42,35 @@ export async function GET(
         { success: false, error: 'Курс не найден' },
         { status: 404 }
       )
+    }
+
+    // Студенты не могут видеть черновики
+    // Менеджеры и админы могут видеть все курсы, включая свои черновики
+    if (course.status === 'draft') {
+      if (!user) {
+        return NextResponse.json(
+          { success: false, error: 'Курс недоступен' },
+          { status: 403 }
+        )
+      }
+      
+      // Проверяем, может ли пользователь видеть этот черновик
+      // Менеджеры/админы могут видеть все черновики
+      // Обычные пользователи не могут видеть черновики
+      if (user.role === 'student') {
+        return NextResponse.json(
+          { success: false, error: 'Курс недоступен' },
+          { status: 403 }
+        )
+      }
+      
+      // Если пользователь - менеджер, проверяем, что это его курс или он админ
+      if (user.role === 'manager' && course.created_by !== user.id && user.role !== 'admin') {
+        return NextResponse.json(
+          { success: false, error: 'Курс недоступен' },
+          { status: 403 }
+        )
+      }
     }
 
     // Получаем уроки

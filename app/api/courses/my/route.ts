@@ -23,8 +23,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Получаем все курсы
-    const allCourses = await courseDb.getAllCourses()
+    // Получаем только опубликованные курсы для студентов
+    // Менеджеры и админы видят все курсы через другой endpoint
+    const allCourses = user.role === 'student' 
+      ? await courseDb.getPublishedCourses()
+      : await courseDb.getAllCourses()
 
     // Получаем прогресс пользователя по всем курсам
     const userProgress = await Promise.all(

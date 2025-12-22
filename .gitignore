@@ -52,6 +52,7 @@ upload-*.ps1
 *.ps1
 !upload-file.ps1
 !upload-all-changes.ps1
+!setup-github-with-token.ps1
 
 # Temp files
 C:\temp\

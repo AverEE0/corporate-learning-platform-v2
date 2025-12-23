@@ -155,20 +155,37 @@ export default function CoursePlayerPage() {
   }, [progress, totalBlocks])
 
   const checkAnswerCorrect = (block: Block): boolean => {
-    if (block.type !== "quiz" || !block.content) return true
+    if (!block || block.type !== "quiz" || !block.content) return true
 
     const userAnswer = answers[block.id]
     if (!userAnswer) return false
 
     const questionType = block.content.questionType
+    const answersList = block.content.answers
+
+    // Защита от циклических ссылок и некорректных данных
+    if (!Array.isArray(answersList) || answersList.length === 0) {
+      return false
+    }
+
+    // Ограничиваем глубину проверки для безопасности
+    const maxAnswers = 100
+    const safeAnswersList = answersList.slice(0, maxAnswers)
 
     if (questionType === "single") {
-      const correctAnswer = block.content.answers?.find((a: any) => a.isCorrect)
+      // Используем findIndex вместо find для большей безопасности
+      const correctAnswerIndex = safeAnswersList.findIndex((a: any) => a && a.isCorrect === true)
+      if (correctAnswerIndex === -1) return false
+      const correctAnswer = safeAnswersList[correctAnswerIndex]
       return correctAnswer?.id === userAnswer
     }
 
     if (questionType === "multiple") {
-      const correctAnswers = block.content.answers?.filter((a: any) => a.isCorrect).map((a: any) => a.id) || []
+      const correctAnswers = safeAnswersList
+        .filter((a: any) => a && a.isCorrect === true)
+        .map((a: any) => a.id)
+        .filter((id: any) => id !== undefined && id !== null)
+      
       const userAnswers = Array.isArray(userAnswer) ? userAnswer : [userAnswer]
       return correctAnswers.length === userAnswers.length && 
              correctAnswers.every((id: string) => userAnswers.includes(id))

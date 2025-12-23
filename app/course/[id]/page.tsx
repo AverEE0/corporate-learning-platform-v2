@@ -384,6 +384,10 @@ export default function CoursePlayerPage() {
     }
   }
 
+  // Используем useRef для отслеживания последнего сохранения, чтобы избежать рекурсии
+  const lastSaveRef = useRef<{ lessonIndex: number; blockIndex: number } | null>(null)
+  const saveInProgressRef = useRef(false)
+
   useEffect(() => {
     // Используем currentBlockIndex и currentLessonIndex для проверки, а не сам currentBlock
     if (!course || !Array.isArray(course.lessons) || currentLessonIndex >= course.lessons.length) return
@@ -391,12 +395,56 @@ export default function CoursePlayerPage() {
     const lesson = course.lessons[currentLessonIndex]
     if (!lesson || !Array.isArray(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) return
 
-    // Используем setTimeout для отложенного сохранения, чтобы избежать рекурсии
-    const saveTimeout = setTimeout(() => {
-      if (saveProgress) {
-        saveProgress()
+    // Проверяем, не сохраняли ли мы уже для этого блока
+    const lastSave = lastSaveRef.current
+    if (lastSave && lastSave.lessonIndex === currentLessonIndex && lastSave.blockIndex === currentBlockIndex) {
+      // Уже сохраняли для этого блока, пропускаем
+    } else {
+      // Используем setTimeout для отложенного сохранения, чтобы избежать рекурсии
+      if (!saveInProgressRef.current) {
+        saveInProgressRef.current = true
+        const saveTimeout = setTimeout(() => {
+          if (saveProgress) {
+            saveProgress().finally(() => {
+              saveInProgressRef.current = false
+              lastSaveRef.current = { lessonIndex: currentLessonIndex, blockIndex: currentBlockIndex }
+            })
+          } else {
+            saveInProgressRef.current = false
+          }
+        }, 500) // Увеличиваем задержку до 500ms
+        
+        // Получаем тип блока напрямую из данных, чтобы избежать пересчета
+        const block = lesson.blocks[currentBlockIndex]
+        
+        // Устанавливаем таймер для ограничения времени на ответ
+        if (block?.type === "quiz" && block.content?.timeLimit) {
+          const limit = block.content.timeLimit
+          setTimeLeft(limit)
+          
+          const timer = setInterval(() => {
+            setTimeLeft((prev) => {
+              if (prev === null || prev <= 1) {
+                clearInterval(timer)
+                toast.error("Время истекло!")
+                handleNext()
+                return 0
+              }
+              return prev - 1
+            })
+          }, 1000)
+
+          return () => {
+            clearTimeout(saveTimeout)
+            clearInterval(timer)
+          }
+        } else {
+          setTimeLeft(null)
+        }
+        
+        return () => clearTimeout(saveTimeout)
       }
-    }, 100)
+    }
     
     // Получаем тип блока напрямую из данных, чтобы избежать пересчета
     const block = lesson.blocks[currentBlockIndex]
@@ -419,15 +467,12 @@ export default function CoursePlayerPage() {
       }, 1000)
 
       return () => {
-        clearTimeout(saveTimeout)
         clearInterval(timer)
       }
     } else {
       setTimeLeft(null)
     }
-    
-    return () => clearTimeout(saveTimeout)
-  }, [currentBlockIndex, currentLessonIndex, course?.id]) // Используем только стабильные идентификаторы
+  }, [currentBlockIndex, currentLessonIndex, course?.id, saveProgress]) // Добавляем saveProgress в зависимости
 
   if (loading) {
     return (

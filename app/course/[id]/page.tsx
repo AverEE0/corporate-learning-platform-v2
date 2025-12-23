@@ -134,9 +134,30 @@ export default function CoursePlayerPage() {
     }
   }
 
-  const handleNext = () => {
-    if (!currentLesson) return
-
+  // Используем useRef для защиты от рекурсивных вызовов handleNext
+  const isNavigatingRef = useRef(false)
+  const currentLessonIndexRef = useRef(currentLessonIndex)
+  const currentBlockIndexRef = useRef(currentBlockIndex)
+  const courseRefForNavigation = useRef(course)
+  
+  useEffect(() => {
+    currentLessonIndexRef.current = currentLessonIndex
+    currentBlockIndexRef.current = currentBlockIndex
+    courseRefForNavigation.current = course
+  }, [currentLessonIndex, currentBlockIndex, course])
+  
+  const handleNext = useCallback(() => {
+    const currentCourse = courseRefForNavigation.current
+    const lessonIndex = currentLessonIndexRef.current
+    const blockIndex = currentBlockIndexRef.current
+    
+    if (!currentCourse || !currentCourse.lessons || isNavigatingRef.current) return
+    
+    const currentLesson = currentCourse.lessons[lessonIndex]
+    if (!currentLesson || !currentLesson.blocks) return
+    
+    isNavigatingRef.current = true
+    
     // Временно отключена проверка ветвления, чтобы избежать рекурсии
     // if (currentBlock?.type === "quiz" && currentBlock.content?.branching) {
     //   const isCorrect = checkAnswerCorrect(currentBlock)
@@ -144,16 +165,21 @@ export default function CoursePlayerPage() {
     //   return
     // }
 
-    if (currentBlockIndex < currentLesson.blocks.length - 1) {
-      setCurrentBlockIndex(currentBlockIndex + 1)
-    } else if (currentLessonIndex < (course?.lessons.length || 0) - 1) {
-      setCurrentLessonIndex(currentLessonIndex + 1)
+    if (blockIndex < currentLesson.blocks.length - 1) {
+      setCurrentBlockIndex(blockIndex + 1)
+    } else if (lessonIndex < currentCourse.lessons.length - 1) {
+      setCurrentLessonIndex(lessonIndex + 1)
       setCurrentBlockIndex(0)
     } else {
       // Курс завершен
       handleComplete()
     }
-  }
+    
+    // Разрешаем следующую навигацию через небольшую задержку
+    setTimeout(() => {
+      isNavigatingRef.current = false
+    }, 200)
+  }, [])
 
   const handlePrevious = () => {
     if (currentBlockIndex > 0) {
@@ -263,17 +289,25 @@ export default function CoursePlayerPage() {
     saveProgressRef.current = saveProgress
   }, [saveProgress])
 
-  const saveAnswer = async (blockId: string | number, answer: any) => {
-    if (!course || !user) return
-    const newAnswers = { ...answers, [blockId]: answer }
+  // Используем useCallback для saveAnswer, чтобы избежать рекурсии
+  const saveAnswer = useCallback(async (blockId: string | number, answer: any) => {
+    const currentCourse = courseRef.current
+    const currentAnswers = answersRef.current
+    
+    if (!currentCourse || !user) return
+    
+    const newAnswers = { ...currentAnswers, [blockId]: answer }
     setAnswers(newAnswers)
+    
+    // Обновляем ref сразу
+    answersRef.current = newAnswers
     
     try {
       await fetch('/api/progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          courseId: course.id,
+          courseId: currentCourse.id,
           lessonId: currentLesson?.id,
           blockId: blockId,
           answers: newAnswers,
@@ -282,11 +316,12 @@ export default function CoursePlayerPage() {
     } catch (error) {
       console.error('Error saving answer:', error)
     }
-  }
+  }, [user?.id, currentLesson?.id])
 
   // Используем useRef для отслеживания последнего сохранения, чтобы избежать рекурсии
   const lastSaveRef = useRef<{ lessonIndex: number; blockIndex: number } | null>(null)
   const saveInProgressRef = useRef(false)
+  const textAnswerTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     // Используем currentBlockIndex и currentLessonIndex для проверки, а не сам currentBlock
@@ -714,13 +749,20 @@ export default function CoursePlayerPage() {
                       <RadioGroup
                         value={answers[currentBlock.id]?.toString() || ""}
                         onValueChange={async (value) => {
+                          if (isNavigatingRef.current) return // Предотвращаем множественные вызовы
+                          
                           const newAnswers = { ...answers, [currentBlock.id]: value }
                           setAnswers(newAnswers)
-                          await saveAnswer(currentBlock.id, value)
+                          
+                          // Сохраняем ответ без await, чтобы не блокировать UI
+                          saveAnswer(currentBlock.id, value).catch(console.error)
+                          
                           // Автоматически переходим к следующему блоку после выбора ответа (только для single choice)
                           setTimeout(() => {
-                            handleNext()
-                          }, 500) // Небольшая задержка для сохранения ответа
+                            if (!isNavigatingRef.current) {
+                              handleNext()
+                            }
+                          }, 800) // Увеличиваем задержку до 800ms для стабильности
                         }}
                       >
                         {currentBlock.content?.answers?.map((answer: any) => (
@@ -748,7 +790,8 @@ export default function CoursePlayerPage() {
                                     ? [...currentAnswers, answer.id]
                                     : currentAnswers.filter((id: string) => id !== answer.id)
                                   setAnswers({ ...answers, [currentBlock.id]: newAnswers })
-                                  await saveAnswer(currentBlock.id, newAnswers)
+                                  // Сохраняем без await, чтобы не блокировать UI
+                                  saveAnswer(currentBlock.id, newAnswers).catch(console.error)
                                 }}
                               />
                               <label htmlFor={answer.id} className="flex-1 cursor-pointer">
@@ -772,8 +815,13 @@ export default function CoursePlayerPage() {
                         <Textarea
                           value={answers[currentBlock.id] || ""}
                           onChange={(e) => {
-                            setAnswers({ ...answers, [currentBlock.id]: e.target.value })
-                            saveAnswer(currentBlock.id, e.target.value)
+                            const value = e.target.value
+                            setAnswers({ ...answers, [currentBlock.id]: value })
+                            // Используем debounce для сохранения текстовых ответов
+                            const timeoutId = setTimeout(() => {
+                              saveAnswer(currentBlock.id, value).catch(console.error)
+                            }, 1000)
+                            return () => clearTimeout(timeoutId)
                           }}
                           placeholder="Введите ваш ответ..."
                           className="min-h-[120px]"

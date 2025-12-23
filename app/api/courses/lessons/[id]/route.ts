@@ -48,7 +48,7 @@ export async function PUT(
 
     const result = await executeQuery(
       `UPDATE lessons 
-       SET title = $1, description = $2, order_index = $3, updated_at = NOW()
+       SET title = $1, description = $2, order_index = $3
        WHERE id = $4
        RETURNING *`,
       [title.trim(), description?.trim() || '', orderIndex || 0, lessonId]

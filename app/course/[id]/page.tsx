@@ -297,10 +297,11 @@ export default function CoursePlayerPage() {
     }
   }, [currentLessonIndex, currentBlockIndex, timeSpent, user?.id]) // Только примитивные зависимости
 
-  // Сохраняем стабильную ссылку на saveProgress
+  // Сохраняем стабильную ссылку на saveProgress БЕЗ зависимости от saveProgress, чтобы избежать рекурсии
   useEffect(() => {
     saveProgressRef.current = saveProgress
-  }, [saveProgress])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLessonIndex, currentBlockIndex, timeSpent, user?.id]) // Используем те же зависимости, что и в useCallback
 
   // Используем useCallback для saveAnswer, чтобы избежать рекурсии
   const saveAnswer = useCallback(async (blockId: string | number, answer: any) => {

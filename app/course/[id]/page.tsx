@@ -66,11 +66,16 @@ export default function CoursePlayerPage() {
     return value != null && typeof value === 'object' && 'length' in value && typeof value.length === 'number'
   }
 
-  // Вычисляем напрямую без useMemo
-  const totalBlocks = course?.lessons?.reduce((sum, l) => {
-    if (!l || !isArraySafe(l.blocks)) return sum
-    return sum + l.blocks.length
-  }, 0) || 0
+  // Вычисляем напрямую без useMemo и без методов массивов (избегаем рекурсии)
+  let totalBlocks = 0
+  if (course?.lessons && isArraySafe(course.lessons)) {
+    for (let i = 0; i < course.lessons.length; i++) {
+      const l = course.lessons[i]
+      if (l && isArraySafe(l.blocks)) {
+        totalBlocks += l.blocks.length
+      }
+    }
+  }
 
   const completedBlocks = Math.floor((progress / 100) * totalBlocks)
 
@@ -120,15 +125,17 @@ export default function CoursePlayerPage() {
         // Переход к конкретному блоку
         const targetBlockId = branching.targetBlockId
         if (targetBlockId) {
-          // Находим блок по ID
+          // Находим блок по ID (без findIndex, чтобы избежать рекурсии)
           for (let i = 0; i < course.lessons.length; i++) {
-            const blockIndex = course.lessons[i].blocks.findIndex((b: any) => 
-              b.id.toString() === targetBlockId || b.title === targetBlockId
-            )
-            if (blockIndex !== -1) {
-              setCurrentLessonIndex(i)
-              setCurrentBlockIndex(blockIndex)
-              return
+            const lesson = course.lessons[i]
+            if (!lesson || !isArraySafe(lesson.blocks)) continue
+            for (let j = 0; j < lesson.blocks.length; j++) {
+              const b = lesson.blocks[j]
+              if (b && (b.id?.toString() === targetBlockId || b.title === targetBlockId)) {
+                setCurrentLessonIndex(i)
+                setCurrentBlockIndex(j)
+                return
+              }
             }
           }
         }
@@ -464,15 +471,29 @@ export default function CoursePlayerPage() {
               setAnswers(progressData.progress.answers)
             }
             
-            // Восстанавливаем позицию в курсе
-            if (progressData.progress.lessonId && progressData.progress.blockId) {
-              const lessonIndex = data.course.lessons?.findIndex((l: Lesson) => l.id === progressData.progress.lessonId) ?? -1
+            // Восстанавливаем позицию в курсе (без findIndex, чтобы избежать рекурсии)
+            if (progressData.progress.lessonId && progressData.progress.blockId && data.course.lessons) {
+              let lessonIndex = -1
+              for (let i = 0; i < data.course.lessons.length; i++) {
+                if (data.course.lessons[i]?.id === progressData.progress.lessonId) {
+                  lessonIndex = i
+                  break
+                }
+              }
               if (lessonIndex >= 0) {
                 setCurrentLessonIndex(lessonIndex)
                 const lesson = data.course.lessons[lessonIndex]
-                const blockIndex = lesson?.blocks?.findIndex((b: Block) => b.id === progressData.progress.blockId) ?? -1
-                if (blockIndex >= 0) {
-                  setCurrentBlockIndex(blockIndex)
+                if (lesson && isArraySafe(lesson.blocks)) {
+                  let blockIndex = -1
+                  for (let j = 0; j < lesson.blocks.length; j++) {
+                    if (lesson.blocks[j]?.id === progressData.progress.blockId) {
+                      blockIndex = j
+                      break
+                    }
+                  }
+                  if (blockIndex >= 0) {
+                    setCurrentBlockIndex(blockIndex)
+                  }
                 }
               }
             }
@@ -512,20 +533,22 @@ export default function CoursePlayerPage() {
 
   // Вычисляем прогресс по урокам для боковой панели
   // Используем useMemo с правильными зависимостями для обновления при изменении answers
+  // БЕЗ методов массивов (forEach) для избежания рекурсии
   const lessonProgress = useMemo(() => {
-    if (!course?.lessons) return {}
+    if (!course?.lessons || !isArraySafe(course.lessons)) return {}
     const progressMap: Record<number, number> = {}
     
-    course.lessons.forEach((lesson) => {
-      if (!lesson || !lesson.blocks || lesson.blocks.length === 0) {
+    for (let i = 0; i < course.lessons.length; i++) {
+      const lesson = course.lessons[i]
+      if (!lesson || !isArraySafe(lesson.blocks) || lesson.blocks.length === 0) {
         progressMap[lesson.id] = 0
-        return
+        continue
       }
       
       // Подсчитываем пройденные блоки
       let completedCount = 0
-      for (let i = 0; i < lesson.blocks.length; i++) {
-        const block = lesson.blocks[i]
+      for (let j = 0; j < lesson.blocks.length; j++) {
+        const block = lesson.blocks[j]
         if (block && block.id !== undefined) {
           const answer = answers[block.id]
           if (answer !== undefined && answer !== null && answer !== "" && 
@@ -536,19 +559,25 @@ export default function CoursePlayerPage() {
       }
       
       progressMap[lesson.id] = Math.round((completedCount / lesson.blocks.length) * 100)
-    })
+    }
     
     return progressMap
   }, [course?.lessons, answers]) // Явно указываем зависимости для обновления
 
   // Создаем ключ для принудительного обновления боковой панели при изменении ответов
+  // БЕЗ filter для избежания рекурсии
   const sidebarKey = useMemo(() => {
     // Создаем ключ на основе количества пройденных блоков
-    const completedCount = Object.keys(answers).filter(key => {
+    let completedCount = 0
+    const answerKeys = Object.keys(answers)
+    for (let i = 0; i < answerKeys.length; i++) {
+      const key = answerKeys[i]
       const answer = answers[key]
-      return answer !== undefined && answer !== null && answer !== "" && 
-             !(isArraySafe(answer) && answer.length === 0)
-    }).length
+      if (answer !== undefined && answer !== null && answer !== "" && 
+          !(isArraySafe(answer) && answer.length === 0)) {
+        completedCount++
+      }
+    }
     return `sidebar-${completedCount}-${currentLessonIndex}-${currentBlockIndex}`
   }, [answers, currentLessonIndex, currentBlockIndex])
 
@@ -587,11 +616,21 @@ export default function CoursePlayerPage() {
             {/* Боковая панель с содержанием курса */}
             <div className="lg:col-span-1" key={sidebarKey}>
               <CourseSidebar
-                lessons={course.lessons?.map((l) => ({
-                  id: l.id,
-                  title: l.title,
-                  blocks: l.blocks || [],
-                })) || []}
+                lessons={(() => {
+                  if (!course.lessons || !isArraySafe(course.lessons)) return []
+                  const result = []
+                  for (let i = 0; i < course.lessons.length; i++) {
+                    const l = course.lessons[i]
+                    if (l) {
+                      result.push({
+                        id: l.id,
+                        title: l.title,
+                        blocks: l.blocks || [],
+                      })
+                    }
+                  }
+                  return result
+                })()}
                 currentLessonIndex={currentLessonIndex}
                 currentBlockIndex={currentBlockIndex}
                 onNavigate={(lessonIndex, blockIndex) => {
@@ -791,61 +830,108 @@ export default function CoursePlayerPage() {
                       </div>
                     )}
                     
-                    {currentBlock.content?.questionType === "single" && (
-                      <RadioGroup
-                        value={answers[currentBlock.id]?.toString() || ""}
-                        onValueChange={async (value) => {
-                          if (isNavigatingRef.current) return // Предотвращаем множественные вызовы
-                          
-                          const newAnswers = { ...answers, [currentBlock.id]: value }
-                          setAnswers(newAnswers)
-                          
-                          // Сохраняем ответ без await, чтобы не блокировать UI
-                          saveAnswer(currentBlock.id, value).catch(console.error)
-                          
-                          // Автоматически переходим к следующему блоку после выбора ответа (только для single choice)
-                          setTimeout(() => {
-                            if (!isNavigatingRef.current) {
-                              handleNext()
-                            }
-                          }, 800) // Увеличиваем задержку до 800ms для стабильности
-                        }}
-                      >
-                        {currentBlock.content?.answers?.map((answer: any) => (
-                          <div key={answer.id} className="flex items-center space-x-2 p-3 border rounded-md hover:bg-muted/50">
-                            <RadioGroupItem value={answer.id} id={answer.id} />
-                            <label htmlFor={answer.id} className="flex-1 cursor-pointer">
-                              {answer.text}
-                            </label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    )}
+                    {currentBlock.content?.questionType === "single" && (() => {
+                      // Создаем массив элементов без использования .map() для избежания рекурсии
+                      const answersList = currentBlock.content?.answers
+                      const answerElements: JSX.Element[] = []
+                      if (answersList && isArraySafe(answersList)) {
+                        for (let i = 0; i < answersList.length; i++) {
+                          const answer = answersList[i]
+                          if (answer) {
+                            answerElements.push(
+                              <div key={answer.id} className="flex items-center space-x-2 p-3 border rounded-md hover:bg-muted/50">
+                                <RadioGroupItem value={answer.id} id={answer.id} />
+                                <label htmlFor={answer.id} className="flex-1 cursor-pointer">
+                                  {answer.text}
+                                </label>
+                              </div>
+                            )
+                          }
+                        }
+                      }
+                      return (
+                        <RadioGroup
+                          value={answers[currentBlock.id]?.toString() || ""}
+                          onValueChange={async (value) => {
+                            if (isNavigatingRef.current) return // Предотвращаем множественные вызовы
+                            
+                            const newAnswers = { ...answers, [currentBlock.id]: value }
+                            setAnswers(newAnswers)
+                            
+                            // Сохраняем ответ без await, чтобы не блокировать UI
+                            saveAnswer(currentBlock.id, value).catch(console.error)
+                            
+                            // Автоматически переходим к следующему блоку после выбора ответа (только для single choice)
+                            setTimeout(() => {
+                              if (!isNavigatingRef.current) {
+                                handleNext()
+                              }
+                            }, 800) // Увеличиваем задержку до 800ms для стабильности
+                          }}
+                        >
+                          {answerElements}
+                        </RadioGroup>
+                      )
+                    })()}
 
-                    {currentBlock.content?.questionType === "multiple" && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          {currentBlock.content?.answers?.map((answer: any) => (
-                            <div key={answer.id} className="flex items-center space-x-2 p-3 border rounded-md hover:bg-muted/50">
-                              <Checkbox
-                                id={answer.id}
-                                checked={(answers[currentBlock.id] || []).includes(answer.id)}
-                                onCheckedChange={async (checked) => {
-                                  const currentAnswers = answers[currentBlock.id] || []
-                                  const newAnswers = checked
-                                    ? [...currentAnswers, answer.id]
-                                    : currentAnswers.filter((id: string) => id !== answer.id)
-                                  setAnswers({ ...answers, [currentBlock.id]: newAnswers })
-                                  // Сохраняем без await, чтобы не блокировать UI
-                                  saveAnswer(currentBlock.id, newAnswers).catch(console.error)
-                                }}
-                              />
-                              <label htmlFor={answer.id} className="flex-1 cursor-pointer">
-                                {answer.text}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
+                    {currentBlock.content?.questionType === "multiple" && (() => {
+                      // Создаем массив элементов без использования .map() для избежания рекурсии
+                      const answersList = currentBlock.content?.answers
+                      const answerElements: JSX.Element[] = []
+                      if (answersList && isArraySafe(answersList)) {
+                        for (let i = 0; i < answersList.length; i++) {
+                          const answer = answersList[i]
+                          if (answer) {
+                            const currentAnswers = answers[currentBlock.id] || []
+                            let isChecked = false
+                            for (let j = 0; j < currentAnswers.length; j++) {
+                              if (currentAnswers[j] === answer.id) {
+                                isChecked = true
+                                break
+                              }
+                            }
+                            answerElements.push(
+                              <div key={answer.id} className="flex items-center space-x-2 p-3 border rounded-md hover:bg-muted/50">
+                                <Checkbox
+                                  id={answer.id}
+                                  checked={isChecked}
+                                  onCheckedChange={async (checked) => {
+                                    const currentAnswers = answers[currentBlock.id] || []
+                                    let newAnswers: any[]
+                                    if (checked) {
+                                      // Добавляем ответ
+                                      newAnswers = []
+                                      for (let k = 0; k < currentAnswers.length; k++) {
+                                        newAnswers.push(currentAnswers[k])
+                                      }
+                                      newAnswers.push(answer.id)
+                                    } else {
+                                      // Удаляем ответ (без filter, чтобы избежать рекурсии)
+                                      newAnswers = []
+                                      for (let k = 0; k < currentAnswers.length; k++) {
+                                        if (currentAnswers[k] !== answer.id) {
+                                          newAnswers.push(currentAnswers[k])
+                                        }
+                                      }
+                                    }
+                                    setAnswers({ ...answers, [currentBlock.id]: newAnswers })
+                                    // Сохраняем без await, чтобы не блокировать UI
+                                    saveAnswer(currentBlock.id, newAnswers).catch(console.error)
+                                  }}
+                                />
+                                <label htmlFor={answer.id} className="flex-1 cursor-pointer">
+                                  {answer.text}
+                                </label>
+                              </div>
+                            )
+                          }
+                        }
+                      }
+                      return (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            {answerElements}
+                          </div>
                         <Button
                           onClick={handleNext}
                           disabled={!answers[currentBlock.id] || (isArraySafe(answers[currentBlock.id]) && answers[currentBlock.id].length === 0)}
@@ -995,22 +1081,35 @@ export default function CoursePlayerPage() {
                   </div>
                 )}
 
-                {currentBlock.type === "sequence" && (
-                      <div className="space-y-4">
-                        <p className="text-lg font-medium">{currentBlock.content?.instruction || "Расставьте элементы в правильном порядке"}</p>
-                        <div className="space-y-2">
-                          {currentBlock.content?.items?.map((item: any, index: number) => (
-                            <div
-                              key={item.id || index}
-                              className="p-4 border rounded-md bg-muted/50 cursor-move"
-                              draggable
-                            >
-                              {item.text || item.title || `Элемент ${index + 1}`}
-                            </div>
-                          ))}
+                {currentBlock.type === "sequence" && (() => {
+                      // Создаем массив элементов без использования .map() для избежания рекурсии
+                      const items = currentBlock.content?.items
+                      const itemElements: JSX.Element[] = []
+                      if (items && isArraySafe(items)) {
+                        for (let i = 0; i < items.length; i++) {
+                          const item = items[i]
+                          if (item) {
+                            itemElements.push(
+                              <div
+                                key={item.id || i}
+                                className="p-4 border rounded-md bg-muted/50 cursor-move"
+                                draggable
+                              >
+                                {item.text || item.title || `Элемент ${i + 1}`}
+                              </div>
+                            )
+                          }
+                        }
+                      }
+                      return (
+                        <div className="space-y-4">
+                          <p className="text-lg font-medium">{currentBlock.content?.instruction || "Расставьте элементы в правильном порядке"}</p>
+                          <div className="space-y-2">
+                            {itemElements}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )
+                    })()}
               </CardContent>
             </Card>
           </motion.div>

@@ -71,8 +71,11 @@ export default function CoursePlayerPage() {
   if (course?.lessons && isArraySafe(course.lessons)) {
     for (let i = 0; i < course.lessons.length; i++) {
       const l = course.lessons[i]
-      if (l && isArraySafe(l.blocks)) {
-        totalBlocks += l.blocks.length
+      if (l && l.blocks) {
+        const blocks = l.blocks
+        if (isArraySafe(blocks)) {
+          totalBlocks += blocks.length
+        }
       }
     }
   }

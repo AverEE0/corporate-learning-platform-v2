@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -330,12 +330,23 @@ export default function CoursePlayerPage() {
     }
   }
 
-  const saveProgress = async () => {
+  // Используем useCallback для стабильной ссылки на функцию
+  const saveProgress = useCallback(async () => {
     if (!course || !user) return
 
+    // Получаем данные напрямую из course, а не из мемоизированных значений
+    const lessons = course.lessons || []
+    if (currentLessonIndex >= lessons.length) return
+    
+    const lesson = lessons[currentLessonIndex]
+    if (!lesson || !Array.isArray(lesson.blocks)) return
+    
+    const blocks = lesson.blocks
+    const blocksCount = blocks.length || 1
+
     const completionPercentage = Math.round(
-      ((currentLessonIndex * 100 + (currentBlockIndex + 1) * (100 / (currentLesson?.blocks.length || 1))) / 
-      (course.lessons.length * 100)) * 100
+      ((currentLessonIndex * 100 + (currentBlockIndex + 1) * (100 / blocksCount)) / 
+      (lessons.length * 100)) * 100
     )
 
     try {
@@ -344,8 +355,8 @@ export default function CoursePlayerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           courseId: course.id,
-          lessonId: currentLesson?.id,
-          blockId: currentBlock?.id,
+          lessonId: lesson.id,
+          blockId: blocks[currentBlockIndex]?.id,
           completionPercentage,
           timeSpent,
           completed: false,
@@ -357,7 +368,7 @@ export default function CoursePlayerPage() {
     } catch (error) {
       console.error('Error saving progress:', error)
     }
-  }
+  }, [course?.id, currentLessonIndex, currentBlockIndex, timeSpent, user?.id, answers]) // Стабильные зависимости
 
   const saveAnswer = async (blockId: string | number, answer: any) => {
     if (!course || !user) return

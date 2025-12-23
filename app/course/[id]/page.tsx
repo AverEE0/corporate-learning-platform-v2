@@ -394,7 +394,7 @@ export default function CoursePlayerPage() {
     if (!course || !course.lessons || !isArraySafe(course.lessons) || currentLessonIndex >= course.lessons.length) return
     
     const lesson = course.lessons[currentLessonIndex]
-    if (!lesson || !isArraySafe(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) return
+    if (!lesson || !lesson.blocks || !isArraySafe(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) return
 
     // Проверяем, не сохраняли ли мы уже для этого блока
     const lastSave = lastSaveRef.current

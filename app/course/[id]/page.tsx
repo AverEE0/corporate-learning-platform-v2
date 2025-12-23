@@ -61,9 +61,14 @@ export default function CoursePlayerPage() {
   const currentLesson = course?.lessons?.[currentLessonIndex]
   const currentBlock = currentLesson?.blocks?.[currentBlockIndex]
 
+  // Безопасная проверка массива без использования Array.isArray (избегаем рекурсии)
+  const isArraySafe = (value: any): boolean => {
+    return value != null && typeof value === 'object' && 'length' in value && typeof value.length === 'number'
+  }
+
   // Вычисляем напрямую без useMemo
   const totalBlocks = course?.lessons?.reduce((sum, l) => {
-    if (!l || !Array.isArray(l.blocks)) return sum
+    if (!l || !isArraySafe(l.blocks)) return sum
     return sum + l.blocks.length
   }, 0) || 0
 
@@ -248,7 +253,7 @@ export default function CoursePlayerPage() {
     if (currentLessonIndex >= lessons.length) return
     
     const lesson = lessons[currentLessonIndex]
-    if (!lesson || !Array.isArray(lesson.blocks)) return
+    if (!lesson || !isArraySafe(lesson.blocks)) return
     
     const blocks = lesson.blocks
     const blocksCount = blocks.length || 1
@@ -326,13 +331,13 @@ export default function CoursePlayerPage() {
 
   // Используем отдельный useEffect для таймера, чтобы избежать рекурсии
   useEffect(() => {
-    if (!course || !Array.isArray(course.lessons) || currentLessonIndex >= course.lessons.length) {
+    if (!course || !isArraySafe(course.lessons) || currentLessonIndex >= course.lessons.length) {
       setTimeLeft(null)
       return
     }
     
     const lesson = course.lessons[currentLessonIndex]
-    if (!lesson || !Array.isArray(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) {
+    if (!lesson || !isArraySafe(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) {
       setTimeLeft(null)
       return
     }
@@ -371,10 +376,10 @@ export default function CoursePlayerPage() {
   // Отдельный useEffect для сохранения прогресса
   useEffect(() => {
     // Используем currentBlockIndex и currentLessonIndex для проверки, а не сам currentBlock
-    if (!course || !Array.isArray(course.lessons) || currentLessonIndex >= course.lessons.length) return
+    if (!course || !isArraySafe(course.lessons) || currentLessonIndex >= course.lessons.length) return
     
     const lesson = course.lessons[currentLessonIndex]
-    if (!lesson || !Array.isArray(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) return
+    if (!lesson || !isArraySafe(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) return
 
     // Проверяем, не сохраняли ли мы уже для этого блока
     const lastSave = lastSaveRef.current
@@ -524,7 +529,7 @@ export default function CoursePlayerPage() {
         if (block && block.id !== undefined) {
           const answer = answers[block.id]
           if (answer !== undefined && answer !== null && answer !== "" && 
-              !(Array.isArray(answer) && answer.length === 0)) {
+              !(isArraySafe(answer) && answer.length === 0)) {
             completedCount++
           }
         }
@@ -542,7 +547,7 @@ export default function CoursePlayerPage() {
     const completedCount = Object.keys(answers).filter(key => {
       const answer = answers[key]
       return answer !== undefined && answer !== null && answer !== "" && 
-             !(Array.isArray(answer) && answer.length === 0)
+             !(isArraySafe(answer) && answer.length === 0)
     }).length
     return `sidebar-${completedCount}-${currentLessonIndex}-${currentBlockIndex}`
   }, [answers, currentLessonIndex, currentBlockIndex])
@@ -843,7 +848,7 @@ export default function CoursePlayerPage() {
                         </div>
                         <Button
                           onClick={handleNext}
-                          disabled={!answers[currentBlock.id] || (Array.isArray(answers[currentBlock.id]) && answers[currentBlock.id].length === 0)}
+                          disabled={!answers[currentBlock.id] || (isArraySafe(answers[currentBlock.id]) && answers[currentBlock.id].length === 0)}
                           className="w-full"
                         >
                           Далее

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { 
   Users, BookOpen, TrendingUp, Award, Plus, 
-  Eye, Edit, LogOut, BarChart3, Clock, Download, MessageSquare, Trash2, CheckCircle2
+  Eye, Edit, LogOut, BarChart3, Clock, Download, MessageSquare, Trash2, CheckCircle2, Send
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { toast } from "sonner"
@@ -132,6 +132,57 @@ export default function ManagerDashboardPage() {
     } finally {
       setDeleteDialogOpen(false)
       setCourseToDelete(null)
+    }
+  }
+
+  const handlePublishCourse = async (courseId: number, courseTitle: string) => {
+    try {
+      // Получаем CSRF токен
+      const csrfResponse = await fetch('/api/csrf-token', {
+        credentials: 'include',
+      })
+      const csrfData = await csrfResponse.json()
+      const csrfToken = csrfData.token
+
+      // Получаем текущие данные курса
+      const courseResponse = await fetch(`/api/courses/${courseId}`, {
+        credentials: 'include',
+      })
+      const courseData = await courseResponse.json()
+
+      if (!courseResponse.ok || !courseData.success) {
+        toast.error('Ошибка загрузки данных курса')
+        return
+      }
+
+      const course = courseData.course
+
+      // Обновляем статус на published
+      const updateResponse = await fetch(`/api/courses/${courseId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: course.title,
+          description: course.description,
+          status: 'published',
+        }),
+      })
+
+      const updateData = await updateResponse.json()
+
+      if (updateResponse.ok && updateData.success) {
+        toast.success(`Курс "${courseTitle}" успешно опубликован! Теперь студенты могут его видеть.`)
+        loadData()
+      } else {
+        toast.error(updateData.error || 'Ошибка публикации курса')
+      }
+    } catch (error: any) {
+      console.error('Error publishing course:', error)
+      toast.error('Ошибка публикации курса')
     }
   }
 
@@ -432,6 +483,21 @@ export default function ManagerDashboardPage() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
+                        {course.status === 'draft' && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handlePublishCourse(course.id, course.title)
+                            }}
+                            title="Опубликовать курс"
+                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button 
                           variant="ghost" 
                           size="icon"

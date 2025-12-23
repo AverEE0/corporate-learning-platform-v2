@@ -391,7 +391,7 @@ export default function CoursePlayerPage() {
   // Отдельный useEffect для сохранения прогресса
   useEffect(() => {
     // Используем currentBlockIndex и currentLessonIndex для проверки, а не сам currentBlock
-    if (!course || !isArraySafe(course.lessons) || currentLessonIndex >= course.lessons.length) return
+    if (!course || !course.lessons || !isArraySafe(course.lessons) || currentLessonIndex >= course.lessons.length) return
     
     const lesson = course.lessons[currentLessonIndex]
     if (!lesson || !isArraySafe(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) return

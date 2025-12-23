@@ -315,6 +315,7 @@ export default function CoursePlayerPage() {
   // Используем useRef для хранения последних значений, чтобы избежать рекурсии
   const answersRef = useRef(answers)
   const courseRef = useRef(course)
+  const saveProgressRef = useRef<(() => Promise<void>) | null>(null)
   
   useEffect(() => {
     answersRef.current = answers
@@ -370,6 +371,11 @@ export default function CoursePlayerPage() {
     }
   }, [currentLessonIndex, currentBlockIndex, timeSpent, user?.id]) // Только примитивные зависимости
 
+  // Сохраняем стабильную ссылку на saveProgress
+  useEffect(() => {
+    saveProgressRef.current = saveProgress
+  }, [saveProgress])
+
   const saveAnswer = async (blockId: string | number, answer: any) => {
     if (!course || !user) return
     const newAnswers = { ...answers, [blockId]: answer }
@@ -406,19 +412,20 @@ export default function CoursePlayerPage() {
     if (lastSave && lastSave.lessonIndex === currentLessonIndex && lastSave.blockIndex === currentBlockIndex) {
       // Уже сохраняли для этого блока, пропускаем
     } else {
-      // Используем setTimeout для отложенного сохранения, чтобы избежать рекурсии
-      if (!saveInProgressRef.current) {
-        saveInProgressRef.current = true
-        const saveTimeout = setTimeout(() => {
-          if (saveProgress) {
-            saveProgress().finally(() => {
+    // Используем setTimeout для отложенного сохранения, чтобы избежать рекурсии
+        if (!saveInProgressRef.current) {
+          saveInProgressRef.current = true
+          const saveTimeout = setTimeout(() => {
+            const saveFn = saveProgressRef.current
+            if (saveFn) {
+              saveFn().finally(() => {
+                saveInProgressRef.current = false
+                lastSaveRef.current = { lessonIndex: currentLessonIndex, blockIndex: currentBlockIndex }
+              })
+            } else {
               saveInProgressRef.current = false
-              lastSaveRef.current = { lessonIndex: currentLessonIndex, blockIndex: currentBlockIndex }
-            })
-          } else {
-            saveInProgressRef.current = false
-          }
-        }, 500) // Увеличиваем задержку до 500ms
+            }
+          }, 500) // Увеличиваем задержку до 500ms
         
         // Получаем тип блока напрямую из данных, чтобы избежать пересчета
         const block = lesson.blocks[currentBlockIndex]
@@ -478,7 +485,7 @@ export default function CoursePlayerPage() {
     } else {
       setTimeLeft(null)
     }
-  }, [currentBlockIndex, currentLessonIndex, course?.id, saveProgress]) // Добавляем saveProgress в зависимости
+  }, [currentBlockIndex, currentLessonIndex, course?.id]) // НЕ добавляем saveProgress, используем ref
 
   if (loading) {
     return (

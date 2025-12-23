@@ -513,7 +513,7 @@ export default function CoursePlayerPage() {
   return (
     <ContentProtection>
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
           {/* Заголовок курса */}
           <div className="mb-6">
             <Button
@@ -541,25 +541,28 @@ export default function CoursePlayerPage() {
             <Progress value={progress} className="h-2" />
           </div>
 
-          {/* Навигация по урокам */}
-          {course.lessons && course.lessons.length > 1 && (
-            <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
-              {course.lessons.map((lesson, index) => (
-                <Button
-                  key={lesson.id}
-                  variant={index === currentLessonIndex ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setCurrentLessonIndex(index)
-                    setCurrentBlockIndex(0)
-                  }}
-                  className="shrink-0"
-                >
-                  {lesson.title}
-                </Button>
-              ))}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Боковая панель с содержанием курса */}
+            <div className="lg:col-span-1">
+              <CourseSidebar
+                lessons={course.lessons?.map((l) => ({
+                  id: l.id,
+                  title: l.title,
+                  blocks: l.blocks || [],
+                })) || []}
+                currentLessonIndex={currentLessonIndex}
+                currentBlockIndex={currentBlockIndex}
+                onNavigate={(lessonIndex, blockIndex) => {
+                  setCurrentLessonIndex(lessonIndex)
+                  setCurrentBlockIndex(blockIndex)
+                }}
+                progress={lessonProgress}
+                completedBlocks={answers}
+              />
             </div>
-          )}
+            
+            {/* Основной контент */}
+            <div className="lg:col-span-3">
 
           {/* Контент блока */}
           <motion.div

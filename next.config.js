@@ -12,6 +12,15 @@ const nextConfig = {
     },
     middlewareClientMaxBodySize: '500mb',
   },
+  // Принудительное обновление кеша для статических файлов
+  generateBuildId: async () => {
+    return `build-${Date.now()}`
+  },
+  // Отключаем кеширование статических файлов в production
+  onDemandEntries: {
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
+  },
 }
 
 module.exports = nextConfig

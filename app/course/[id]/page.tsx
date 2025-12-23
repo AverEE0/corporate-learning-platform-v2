@@ -985,17 +985,25 @@ export default function CoursePlayerPage() {
                         {recordedAnswers[currentBlock.id] ? (
                           <div className="space-y-2">
                             <audio src={recordedAnswers[currentBlock.id]} controls className="w-full" />
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                const newRecorded = { ...recordedAnswers }
-                                delete newRecorded[currentBlock.id]
-                                setRecordedAnswers(newRecorded)
-                                setAnswers({ ...answers, [currentBlock.id]: undefined })
-                              }}
-                            >
-                              Записать заново
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  const newRecorded = { ...recordedAnswers }
+                                  delete newRecorded[currentBlock.id]
+                                  setRecordedAnswers(newRecorded)
+                                  setAnswers({ ...answers, [currentBlock.id]: undefined })
+                                }}
+                              >
+                                Записать заново
+                              </Button>
+                              <Button
+                                onClick={handleNext}
+                                className="flex-1"
+                              >
+                                Далее
+                              </Button>
+                            </div>
                           </div>
                         ) : (
                           <MediaRecorder
@@ -1038,17 +1046,25 @@ export default function CoursePlayerPage() {
                                 })
                               }}
                             />
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                const newRecorded = { ...recordedAnswers }
-                                delete newRecorded[currentBlock.id]
-                                setRecordedAnswers(newRecorded)
-                                setAnswers({ ...answers, [currentBlock.id]: undefined })
-                              }}
-                            >
-                              Записать заново
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  const newRecorded = { ...recordedAnswers }
+                                  delete newRecorded[currentBlock.id]
+                                  setRecordedAnswers(newRecorded)
+                                  setAnswers({ ...answers, [currentBlock.id]: undefined })
+                                }}
+                              >
+                                Записать заново
+                              </Button>
+                              <Button
+                                onClick={handleNext}
+                                className="flex-1"
+                              >
+                                Далее
+                              </Button>
+                            </div>
                           </div>
                         ) : (
                           <MediaRecorder

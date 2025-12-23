@@ -1,6 +1,6 @@
 "use client"
 
-import { BookOpen, CheckCircle2, Circle, Lock } from "lucide-react"
+import { ListChecks, CheckCircle2, Circle, Lock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
 import { motion, AnimatePresence } from "framer-motion"
@@ -52,7 +52,7 @@ export function CourseSidebar({
     <Card className="h-full p-4 overflow-y-auto">
       <div className="space-y-4">
         <h3 className="font-semibold text-lg flex items-center gap-2">
-          <BookOpen className="h-5 w-5" />
+          <ListChecks className="h-5 w-5 text-primary" />
           Содержание курса
         </h3>
         

@@ -818,10 +818,12 @@ export default function CoursePlayerPage() {
                             const value = e.target.value
                             setAnswers({ ...answers, [currentBlock.id]: value })
                             // Используем debounce для сохранения текстовых ответов
-                            const timeoutId = setTimeout(() => {
+                            if (textAnswerTimeoutRef.current) {
+                              clearTimeout(textAnswerTimeoutRef.current)
+                            }
+                            textAnswerTimeoutRef.current = setTimeout(() => {
                               saveAnswer(currentBlock.id, value).catch(console.error)
                             }, 1000)
-                            return () => clearTimeout(timeoutId)
                           }}
                           placeholder="Введите ваш ответ..."
                           className="min-h-[120px]"

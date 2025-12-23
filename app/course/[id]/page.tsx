@@ -106,7 +106,7 @@ export default function CoursePlayerPage() {
         // Пропускаем следующий блок
         if (currentLesson.blocks && currentBlockIndex + 2 < currentLesson.blocks.length) {
           setCurrentBlockIndex(currentBlockIndex + 2)
-        } else if (currentLessonIndex + 1 < course.lessons.length) {
+        } else if (course.lessons && currentLessonIndex + 1 < course.lessons.length) {
           setCurrentLessonIndex(currentLessonIndex + 1)
           setCurrentBlockIndex(0)
         } else {
@@ -127,7 +127,7 @@ export default function CoursePlayerPage() {
       case "specific":
         // Переход к конкретному блоку
         const targetBlockId = branching.targetBlockId
-        if (targetBlockId) {
+        if (targetBlockId && course.lessons) {
           // Находим блок по ID (без findIndex, чтобы избежать рекурсии)
           for (let i = 0; i < course.lessons.length; i++) {
             const lesson = course.lessons[i]
@@ -544,9 +544,10 @@ export default function CoursePlayerPage() {
   const lessonProgress = useMemo(() => {
     if (!course?.lessons || !isArraySafe(course.lessons)) return {}
     const progressMap: Record<number, number> = {}
+    const lessons = course.lessons
     
-    for (let i = 0; i < course.lessons.length; i++) {
-      const lesson = course.lessons[i]
+    for (let i = 0; i < lessons.length; i++) {
+      const lesson = lessons[i]
       if (!lesson || !isArraySafe(lesson.blocks) || lesson.blocks.length === 0) {
         progressMap[lesson.id] = 0
         continue
@@ -1143,8 +1144,8 @@ export default function CoursePlayerPage() {
             className="gradient-primary text-white"
             disabled={false}
           >
-            {currentLessonIndex === (course.lessons.length - 1) &&
-            currentBlockIndex === (currentLesson?.blocks.length || 1) - 1
+            {course.lessons && currentLessonIndex === (course.lessons.length - 1) &&
+            currentBlockIndex === (currentLesson?.blocks?.length || 1) - 1
               ? "Завершить курс"
               : "Далее"}
             <ArrowRight className="ml-2 h-4 w-4" />

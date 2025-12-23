@@ -932,15 +932,16 @@ export default function CoursePlayerPage() {
                           <div className="space-y-2">
                             {answerElements}
                           </div>
-                        <Button
-                          onClick={handleNext}
-                          disabled={!answers[currentBlock.id] || (isArraySafe(answers[currentBlock.id]) && answers[currentBlock.id].length === 0)}
-                          className="w-full"
-                        >
-                          Далее
-                        </Button>
-                      </div>
-                    )}
+                          <Button
+                            onClick={handleNext}
+                            disabled={!answers[currentBlock.id] || (isArraySafe(answers[currentBlock.id]) && answers[currentBlock.id].length === 0)}
+                            className="w-full"
+                          >
+                            Далее
+                          </Button>
+                        </div>
+                      )
+                    })()}
 
                     {currentBlock.content?.questionType === "text" && (
                       <div className="space-y-4">

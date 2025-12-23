@@ -549,7 +549,7 @@ export default function CoursePlayerPage() {
     
     for (let i = 0; i < lessons.length; i++) {
       const lesson = lessons[i]
-      if (!lesson || !isArraySafe(lesson.blocks) || lesson.blocks.length === 0) {
+      if (!lesson || !lesson.blocks || !isArraySafe(lesson.blocks) || lesson.blocks.length === 0) {
         progressMap[lesson.id] = 0
         continue
       }

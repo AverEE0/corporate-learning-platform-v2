@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -135,10 +135,24 @@ export default function CoursePlayerPage() {
     }
   }
 
-  const currentLesson = course?.lessons[currentLessonIndex]
-  const currentBlock = currentLesson?.blocks[currentBlockIndex]
-  const totalBlocks = course?.lessons.reduce((sum, l) => sum + l.blocks.length, 0) || 0
-  const completedBlocks = Math.floor((progress / 100) * totalBlocks)
+  // Мемоизируем currentLesson и currentBlock, чтобы избежать бесконечных перерендеров
+  const currentLesson = useMemo(() => {
+    if (!course?.lessons || !course.lessons[currentLessonIndex]) return undefined
+    return course.lessons[currentLessonIndex]
+  }, [course, currentLessonIndex])
+
+  const currentBlock = useMemo(() => {
+    if (!currentLesson?.blocks || !currentLesson.blocks[currentBlockIndex]) return undefined
+    return currentLesson.blocks[currentBlockIndex]
+  }, [currentLesson, currentBlockIndex])
+
+  const totalBlocks = useMemo(() => {
+    return course?.lessons.reduce((sum, l) => sum + (l.blocks?.length || 0), 0) || 0
+  }, [course?.lessons])
+
+  const completedBlocks = useMemo(() => {
+    return Math.floor((progress / 100) * totalBlocks)
+  }, [progress, totalBlocks])
 
   const checkAnswerCorrect = (block: Block): boolean => {
     if (block.type !== "quiz" || !block.content) return true
@@ -338,40 +352,45 @@ export default function CoursePlayerPage() {
   }
 
   useEffect(() => {
-    if (currentBlock) {
-      // Используем setTimeout для отложенного сохранения, чтобы избежать рекурсии
-      const saveTimeout = setTimeout(() => {
-        saveProgress()
-      }, 100)
-      
-      // Устанавливаем таймер для ограничения времени на ответ
-      if (currentBlock.type === "quiz" && currentBlock.content?.timeLimit) {
-        const limit = currentBlock.content.timeLimit
-        setTimeLeft(limit)
-        
-        const timer = setInterval(() => {
-          setTimeLeft((prev) => {
-            if (prev === null || prev <= 1) {
-              clearInterval(timer)
-              toast.error("Время истекло!")
-              handleNext()
-              return 0
-            }
-            return prev - 1
-          })
-        }, 1000)
+    // Используем currentBlockIndex и currentLessonIndex для проверки, а не сам currentBlock
+    if (!course || currentLessonIndex >= (course.lessons?.length || 0)) return
+    if (!currentLesson || currentBlockIndex >= (currentLesson.blocks?.length || 0)) return
 
-        return () => {
-          clearTimeout(saveTimeout)
-          clearInterval(timer)
-        }
-      } else {
-        setTimeLeft(null)
-      }
+    // Используем setTimeout для отложенного сохранения, чтобы избежать рекурсии
+    const saveTimeout = setTimeout(() => {
+      saveProgress()
+    }, 100)
+    
+    // Получаем тип блока напрямую из данных, чтобы избежать пересчета
+    const block = currentLesson.blocks?.[currentBlockIndex]
+    
+    // Устанавливаем таймер для ограничения времени на ответ
+    if (block?.type === "quiz" && block.content?.timeLimit) {
+      const limit = block.content.timeLimit
+      setTimeLeft(limit)
       
-      return () => clearTimeout(saveTimeout)
+      const timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(timer)
+            toast.error("Время истекло!")
+            handleNext()
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+
+      return () => {
+        clearTimeout(saveTimeout)
+        clearInterval(timer)
+      }
+    } else {
+      setTimeLeft(null)
     }
-  }, [currentBlockIndex, currentLessonIndex]) // Убрали currentBlock из зависимостей, чтобы избежать рекурсии
+    
+    return () => clearTimeout(saveTimeout)
+  }, [currentBlockIndex, currentLessonIndex, course?.id, currentLesson?.id]) // Используем стабильные идентификаторы
 
   if (loading) {
     return (

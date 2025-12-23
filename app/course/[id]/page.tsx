@@ -339,7 +339,10 @@ export default function CoursePlayerPage() {
 
   useEffect(() => {
     if (currentBlock) {
-      saveProgress()
+      // Используем setTimeout для отложенного сохранения, чтобы избежать рекурсии
+      const saveTimeout = setTimeout(() => {
+        saveProgress()
+      }, 100)
       
       // Устанавливаем таймер для ограничения времени на ответ
       if (currentBlock.type === "quiz" && currentBlock.content?.timeLimit) {
@@ -358,12 +361,17 @@ export default function CoursePlayerPage() {
           })
         }, 1000)
 
-        return () => clearInterval(timer)
+        return () => {
+          clearTimeout(saveTimeout)
+          clearInterval(timer)
+        }
       } else {
         setTimeLeft(null)
       }
+      
+      return () => clearTimeout(saveTimeout)
     }
-  }, [currentBlockIndex, currentLessonIndex, currentBlock])
+  }, [currentBlockIndex, currentLessonIndex]) // Убрали currentBlock из зависимостей, чтобы избежать рекурсии
 
   if (loading) {
     return (
@@ -645,6 +653,7 @@ export default function CoursePlayerPage() {
                           loop={false}
                           controls={true}
                           className="w-full h-full"
+                          key={`video-${currentBlock.id}-${currentBlockIndex}`} // Добавляем key для пересоздания компонента при смене блока
                         />
                       )
                     })() : (
@@ -821,7 +830,24 @@ export default function CoursePlayerPage() {
                       <div className="space-y-4">
                         {recordedAnswers[currentBlock.id] ? (
                           <div className="space-y-2">
-                            <video src={recordedAnswers[currentBlock.id]} controls className="w-full rounded-md" />
+                            <video 
+                              src={recordedAnswers[currentBlock.id]} 
+                              controls 
+                              className="w-full rounded-md"
+                              onError={(e) => {
+                                console.error('Video playback error:', e)
+                                toast.error('Ошибка воспроизведения видео. Попробуйте записать заново.')
+                              }}
+                              onPlay={(e) => {
+                                // Игнорируем ошибки прерывания воспроизведения
+                                const video = e.currentTarget
+                                video.play().catch((error) => {
+                                  if (error.name !== 'AbortError') {
+                                    console.error('Video play error:', error)
+                                  }
+                                })
+                              }}
+                            />
                             <Button
                               variant="outline"
                               onClick={() => {

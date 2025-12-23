@@ -68,7 +68,7 @@ export function VideoPlayerEnhanced({
     let controlsTimeout: NodeJS.Timeout
     const resetControlsTimeout = () => {
       clearTimeout(controlsTimeout)
-      if (isPlaying) {
+      if (video && !video.paused) {
         setShowControls(true)
         controlsTimeout = setTimeout(() => setShowControls(false), 3000)
       }
@@ -86,16 +86,33 @@ export function VideoPlayerEnhanced({
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
       clearTimeout(controlsTimeout)
     }
-  }, [isPlaying])
+  }, []) // Убрали isPlaying из зависимостей, чтобы избежать бесконечных перерендеров
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     const video = videoRef.current
     if (!video) return
 
-    if (isPlaying) {
-      video.pause()
-    } else {
-      video.play()
+    try {
+      if (isPlaying) {
+        video.pause()
+      } else {
+        // Обработка ошибок воспроизведения
+        const playPromise = video.play()
+        if (playPromise !== undefined) {
+          await playPromise.catch((error) => {
+            console.error('Error playing video:', error)
+            // Игнорируем ошибки типа AbortError (когда видео прерывается)
+            if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
+              console.warn('Video play error:', error)
+            }
+          })
+        }
+      }
+    } catch (error: any) {
+      // Игнорируем ошибки прерывания воспроизведения
+      if (error.name !== 'AbortError') {
+        console.error('Error toggling play:', error)
+      }
     }
   }
 

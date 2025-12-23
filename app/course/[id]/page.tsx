@@ -7,133 +7,54 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { 
-  ArrowLeft, ArrowRight, Play, Volume2, FileText, 
-  HelpCircle, CheckCircle, Clock, BookOpen, ListOrdered, FileUp, MessageSquare, Image as ImageIcon
-} from "lucide-react"
-import { useAuth } from "@/lib/auth-context"
-import { toast } from "sonner"
-import Link from "next/link"
-import { MediaRecorder } from "@/components/media-recorder"
 import { Textarea } from "@/components/ui/textarea"
+import { ArrowLeft, ArrowRight, Clock, CheckCircle2, XCircle, Play, Pause } from "lucide-react"
+import { toast } from "sonner"
+import { useAuth } from "@/contexts/AuthContext"
+import ContentProtection from "@/components/content-protection"
+import MediaRecorder from "@/components/media-recorder"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
-import { SequenceOrderBlock } from "@/components/course/sequence-order-block"
-import { FileUploadBlock } from "@/components/course/file-upload-block"
-import { ContentProtection } from "@/components/content-protection"
-import { CourseSidebar } from "@/components/course-sidebar"
-import { VideoPlayerEnhanced } from "@/components/video-player-enhanced"
+import VideoPlayerEnhanced from "@/components/video-player-enhanced"
 
-interface Course {
-  id: number
-  title: string
-  description: string
-  lessons: Lesson[]
+interface Block {
+  id: string | number
+  type: string
+  title?: string
+  content?: any
+  order_index?: number
 }
 
 interface Lesson {
   id: number
   title: string
-  description: string
-  blocks: Block[]
+  description?: string
+  blocks?: Block[]
+  order_index?: number
 }
 
-interface Block {
+interface Course {
   id: number
-  type: "text" | "video" | "audio" | "image" | "quiz" | "sequence" | "file-upload"
   title: string
-  content: any
+  description?: string
+  lessons?: Lesson[]
 }
 
 export default function CoursePlayerPage() {
   const router = useRouter()
   const params = useParams()
   const { user } = useAuth()
+  const courseId = params?.id ? parseInt(params.id as string) : null
+
   const [course, setCourse] = useState<Course | null>(null)
+  const [loading, setLoading] = useState(true)
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0)
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0)
   const [progress, setProgress] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [timeSpent, setTimeSpent] = useState(0)
+  const [answers, setAnswers] = useState<Record<string | number, any>>({})
+  const [recordedAnswers, setRecordedAnswers] = useState<Record<string | number, string>>({})
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
-  const [answers, setAnswers] = useState<Record<string, any>>({})
-  const [recordedAnswers, setRecordedAnswers] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    if (params.id) {
-      loadCourse(parseInt(params.id as string))
-    }
-  }, [params.id])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeSpent(prev => prev + 1)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
-
-  async function loadCourse(courseId: number) {
-    try {
-      if (!courseId || isNaN(courseId)) {
-        throw new Error('Неверный ID курса')
-      }
-
-      const response = await fetch(`/api/courses/${courseId}`)
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          toast.error("Курс не найден")
-          router.push('/dashboard')
-          return
-        }
-        throw new Error(`Ошибка загрузки: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (!data.success) {
-        throw new Error(data.error || 'Ошибка загрузки курса')
-      }
-
-      if (!data.course) {
-        throw new Error('Данные курса не получены')
-      }
-
-      setCourse(data.course)
-      
-      // Загружаем сохраненный прогресс
-      try {
-        const progressResponse = await fetch(`/api/progress?courseId=${courseId}`)
-        const progressData = await progressResponse.json()
-        
-        if (progressData.success && progressData.progress) {
-          // Восстанавливаем сохраненные ответы
-          const savedAnswers = progressData.progress.answers || {}
-          if (savedAnswers && typeof savedAnswers === 'object') {
-            setAnswers(savedAnswers)
-            // Восстанавливаем URL для медиа ответов
-            const mediaAnswers: Record<string, string> = {}
-            Object.keys(savedAnswers).forEach(key => {
-              const value = savedAnswers[key]
-              if (typeof value === 'string' && (value.startsWith('/api/files/') || value.startsWith('http') || value.includes('blob:'))) {
-                mediaAnswers[key] = value
-              }
-            })
-            setRecordedAnswers(mediaAnswers)
-          }
-        }
-      } catch (progressError) {
-        console.error('Error loading progress:', progressError)
-        // Не прерываем загрузку курса, если прогресс не загрузился
-      }
-    } catch (error: any) {
-      console.error('Error loading course:', error)
-      toast.error(error?.message || "Ошибка загрузки курса")
-      router.push('/dashboard')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   // Вычисляем напрямую без useMemo, чтобы избежать рекурсии
   const currentLesson = course?.lessons?.[currentLessonIndex]
@@ -149,106 +70,10 @@ export default function CoursePlayerPage() {
 
   // ВРЕМЕННО ОТКЛЮЧЕНО: checkAnswerCorrect вызывает бесконечную рекурсию
   // Будет переписано позже с полной защитой от рекурсии
-  const checkAnswerCorrect = (block: Block): boolean => {
-    if (!block || block.type !== "quiz" || !block.content) return true
-
-    // Защита от рекурсии - если уже проверяем этот блок, возвращаем true
-    if (checkingBlocksRef.current.has(block.id)) {
-      console.warn('Circular check detected for block', block.id)
-      return true
-    }
-
-    checkingBlocksRef.current.add(block.id)
-
-    try {
-      const userAnswer = answers[block.id]
-      if (!userAnswer) {
-        checkingBlocksRef.current.delete(block.id)
-        return false
-      }
-
-      const questionType = block.content.questionType
-      const answersList = block.content.answers
-
-      // Защита от циклических ссылок и некорректных данных
-      // Используем простую проверку типа вместо Array.isArray для безопасности
-      if (!answersList || typeof answersList !== 'object' || !('length' in answersList) || answersList.length === 0) {
-        checkingBlocksRef.current.delete(block.id)
-        return false
-      }
-
-      // Ограничиваем глубину проверки для безопасности
-      const maxAnswers = 100
-      let safeAnswersList: any[]
-      try {
-        // Используем простой цикл вместо slice для безопасности
-        safeAnswersList = []
-        const length = Math.min(answersList.length, maxAnswers)
-        for (let i = 0; i < length; i++) {
-          if (i in answersList) {
-            safeAnswersList.push(answersList[i])
-          }
-        }
-      } catch (e) {
-        checkingBlocksRef.current.delete(block.id)
-        return false
-      }
-
-      if (questionType === "single") {
-        // Используем простой цикл вместо findIndex для безопасности
-        let correctAnswer: any = null
-        for (let i = 0; i < safeAnswersList.length; i++) {
-          const a = safeAnswersList[i]
-          if (a && a.isCorrect === true) {
-            correctAnswer = a
-            break
-          }
-        }
-        if (!correctAnswer) {
-          checkingBlocksRef.current.delete(block.id)
-          return false
-        }
-        const result = correctAnswer?.id === userAnswer
-        checkingBlocksRef.current.delete(block.id)
-        return result
-      }
-
-      if (questionType === "multiple") {
-        const correctAnswers: any[] = []
-        for (let i = 0; i < safeAnswersList.length; i++) {
-          const a = safeAnswersList[i]
-          if (a && a.isCorrect === true && a.id !== undefined && a.id !== null) {
-            correctAnswers.push(a.id)
-          }
-        }
-        
-        // Проверяем, является ли userAnswer массивом безопасным способом
-        let userAnswers: any[]
-        if (userAnswer && typeof userAnswer === 'object' && 'length' in userAnswer) {
-          userAnswers = []
-          for (let i = 0; i < userAnswer.length; i++) {
-            if (i in userAnswer) {
-              userAnswers.push(userAnswer[i])
-            }
-          }
-        } else {
-          userAnswers = [userAnswer]
-        }
-        
-        const result = correctAnswers.length === userAnswers.length && 
-               correctAnswers.every((id: string) => userAnswers.includes(id))
-        checkingBlocksRef.current.delete(block.id)
-        return result
-      }
-
-      // Для текстовых, аудио, видео ответов всегда считаем правильными (проверяет менеджер)
-      checkingBlocksRef.current.delete(block.id)
-      return true
-    } catch (error) {
-      console.error('Error in checkAnswerCorrect:', error)
-      checkingBlocksRef.current.delete(block.id)
-      return true // В случае ошибки считаем правильным, чтобы не блокировать
-    }
+  // Проверка правильности ответов будет выполняться на сервере
+  const checkAnswerCorrect = (_block: Block): boolean => {
+    // Всегда возвращаем true, чтобы не блокировать навигацию
+    return true
   }
 
   const handleBranching = (isCorrect: boolean) => {
@@ -276,8 +101,8 @@ export default function CoursePlayerPage() {
         break
 
       case "repeat":
-        // Остаемся на текущем блоке
-        toast.error("Неправильный ответ. Попробуйте еще раз.")
+        // Повторяем текущий блок
+        // Просто остаемся на месте
         break
 
       case "hint":
@@ -312,8 +137,7 @@ export default function CoursePlayerPage() {
   const handleNext = () => {
     if (!currentLesson) return
 
-    // Проверяем ветвление для тестов
-    // Временно отключаем проверку правильности ответа, чтобы избежать рекурсии
+    // Временно отключена проверка ветвления, чтобы избежать рекурсии
     // if (currentBlock?.type === "quiz" && currentBlock.content?.branching) {
     //   const isCorrect = checkAnswerCorrect(currentBlock)
     //   handleBranching(isCorrect)
@@ -360,8 +184,7 @@ export default function CoursePlayerPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Ошибка сохранения прогресса')
+        throw new Error("Ошибка сохранения прогресса")
       }
 
       toast.success("Курс завершен!")
@@ -443,6 +266,7 @@ export default function CoursePlayerPage() {
   const saveAnswer = async (blockId: string | number, answer: any) => {
     if (!course || !user) return
     const newAnswers = { ...answers, [blockId]: answer }
+    setAnswers(newAnswers)
     
     try {
       await fetch('/api/progress', {
@@ -476,20 +300,20 @@ export default function CoursePlayerPage() {
     if (lastSave && lastSave.lessonIndex === currentLessonIndex && lastSave.blockIndex === currentBlockIndex) {
       // Уже сохраняли для этого блока, пропускаем
     } else {
-    // Используем setTimeout для отложенного сохранения, чтобы избежать рекурсии
-        if (!saveInProgressRef.current) {
-          saveInProgressRef.current = true
-          const saveTimeout = setTimeout(() => {
-            const saveFn = saveProgressRef.current
-            if (saveFn) {
-              saveFn().finally(() => {
-                saveInProgressRef.current = false
-                lastSaveRef.current = { lessonIndex: currentLessonIndex, blockIndex: currentBlockIndex }
-              })
-            } else {
+      // Используем setTimeout для отложенного сохранения, чтобы избежать рекурсии
+      if (!saveInProgressRef.current) {
+        saveInProgressRef.current = true
+        const saveTimeout = setTimeout(() => {
+          const saveFn = saveProgressRef.current
+          if (saveFn) {
+            saveFn().finally(() => {
               saveInProgressRef.current = false
-            }
-          }, 500) // Увеличиваем задержку до 500ms
+              lastSaveRef.current = { lessonIndex: currentLessonIndex, blockIndex: currentBlockIndex }
+            })
+          } else {
+            saveInProgressRef.current = false
+          }
+        }, 500) // Увеличиваем задержку до 500ms
         
         // Получаем тип блока напрямую из данных, чтобы избежать пересчета
         const block = lesson.blocks[currentBlockIndex]
@@ -565,218 +389,258 @@ export default function CoursePlayerPage() {
   if (!course) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Card>
-          <CardContent className="py-8 text-center">
-            <p className="text-muted-foreground mb-4">Курс не найден</p>
-            <Link href="/dashboard">
-              <Button>Вернуться к курсам</Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Курс не найден</p>
+          <Button onClick={() => router.push('/dashboard')}>Вернуться на главную</Button>
+        </div>
       </div>
     )
   }
 
-  // Защита от копирования только для студентов
-  const isStudent = user?.role === 'student'
-  
-  return (
-    <ContentProtection enabled={isStudent}>
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {/* Header */}
-      <header className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-lg sm:text-xl font-bold truncate">{course.title}</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                  {currentLesson?.title} • Блок {currentBlockIndex + 1} из {currentLesson?.blocks.length}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 md:gap-4">
-              <div className="text-xs md:text-sm text-muted-foreground hidden sm:block">
-                Прогресс: {Math.round(progress)}%
-              </div>
-              <div className="w-24 md:w-32">
-                <Progress value={progress} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+  // Загружаем курс при монтировании
+  useEffect(() => {
+    const loadCourse = async () => {
+      if (!courseId) {
+        setLoading(false)
+        return
+      }
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-4 gap-6">
-          {/* Sidebar с содержанием */}
-          <div className="lg:col-span-1 hidden lg:block">
-            <div className="sticky top-24">
-              <CourseSidebar
-                lessons={course.lessons || []}
-                currentLessonIndex={currentLessonIndex}
-                currentBlockIndex={currentBlockIndex}
-                onNavigate={(lessonIndex, blockIndex) => {
-                  setCurrentLessonIndex(lessonIndex)
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/courses/${courseId}`, { credentials: 'include' })
+        if (!response.ok) {
+          throw new Error("Ошибка загрузки курса")
+        }
+        const data = await response.json()
+        if (!data.success || !data.course) {
+          throw new Error("Курс не найден")
+        }
+        setCourse(data.course)
+
+        // Загружаем прогресс пользователя
+        const progressResponse = await fetch(`/api/progress?courseId=${courseId}`, { credentials: 'include' })
+        if (progressResponse.ok) {
+          const progressData = await progressResponse.json()
+          if (progressData.success && progressData.progress) {
+            setProgress(progressData.progress.completionPercentage || 0)
+            setTimeSpent(progressData.progress.timeSpent || 0)
+            if (progressData.progress.answers) {
+              setAnswers(progressData.progress.answers)
+            }
+            
+            // Восстанавливаем позицию в курсе
+            if (progressData.progress.lessonId && progressData.progress.blockId) {
+              const lessonIndex = data.course.lessons?.findIndex((l: Lesson) => l.id === progressData.progress.lessonId) ?? -1
+              if (lessonIndex >= 0) {
+                setCurrentLessonIndex(lessonIndex)
+                const lesson = data.course.lessons[lessonIndex]
+                const blockIndex = lesson?.blocks?.findIndex((b: Block) => b.id === progressData.progress.blockId) ?? -1
+                if (blockIndex >= 0) {
                   setCurrentBlockIndex(blockIndex)
-                }}
-                progress={{}}
-              />
-            </div>
-          </div>
+                }
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error('Error loading course:', error)
+        toast.error(error?.message || "Ошибка загрузки курса")
+        router.push('/dashboard')
+      } finally {
+        setLoading(false)
+      }
+    }
 
-          {/* Основной контент */}
-          <div className="lg:col-span-3 max-w-4xl">
-        {/* Lesson Info */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <BookOpen className="h-5 w-5 text-primary" />
-            <span className="font-semibold">{currentLesson?.title}</span>
-            <Badge variant="secondary">
-              Урок {currentLessonIndex + 1} из {course.lessons.length}
-            </Badge>
-          </div>
-          {currentLesson?.description && (
-            <p className="text-sm text-muted-foreground">{currentLesson.description}</p>
-          )}
+    loadCourse()
+  }, [courseId, router])
+
+  // Отслеживаем время, проведенное на странице
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeSpent((prev) => prev + 1)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  if (!currentBlock) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Блок не найден</p>
+          <Button onClick={() => router.push('/dashboard')}>Вернуться на главную</Button>
         </div>
+      </div>
+    )
+  }
 
-        {/* Block Content */}
-        {currentBlock && (
+  return (
+    <ContentProtection>
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+        <div className="container mx-auto px-4 py-8 max-w-6xl">
+          {/* Заголовок курса */}
+          <div className="mb-6">
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/dashboard')}
+              className="mb-4"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Назад
+            </Button>
+            <h1 className="text-3xl font-bold mb-2">{course.title}</h1>
+            {course.description && (
+              <p className="text-muted-foreground">{course.description}</p>
+            )}
+          </div>
+
+          {/* Прогресс */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">
+                Прогресс: {completedBlocks} / {totalBlocks} блоков
+              </span>
+              <span className="text-sm text-muted-foreground">{progress}%</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+          </div>
+
+          {/* Навигация по урокам */}
+          {course.lessons && course.lessons.length > 1 && (
+            <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+              {course.lessons.map((lesson, index) => (
+                <Button
+                  key={lesson.id}
+                  variant={index === currentLessonIndex ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setCurrentLessonIndex(index)
+                    setCurrentBlockIndex(0)
+                  }}
+                  className="shrink-0"
+                >
+                  {lesson.title}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {/* Контент блока */}
           <motion.div
-            key={currentBlock.id}
+            key={`${currentLessonIndex}-${currentBlockIndex}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <Card className="gradient-card border-0 shadow-lg mb-6">
+            <Card className="mb-6">
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  {currentBlock.type === "text" && <FileText className="h-5 w-5" />}
-                  {currentBlock.type === "video" && <Play className="h-5 w-5" />}
-                  {currentBlock.type === "audio" && <Volume2 className="h-5 w-5" />}
-                  {currentBlock.type === "image" && <ImageIcon className="h-5 w-5" />}
-                  {currentBlock.type === "quiz" && <HelpCircle className="h-5 w-5" />}
-                  {currentBlock.type === "sequence" && <ListOrdered className="h-5 w-5" />}
-                  {currentBlock.type === "file-upload" && <FileUp className="h-5 w-5" />}
-                  <CardTitle>{currentBlock.title}</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Link href={`/course/${course.id}/discussions`}>
-                      <Button variant="outline" size="sm">
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Обсуждения
-                      </Button>
-                    </Link>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-2xl">{currentBlock.title || `Блок ${currentBlockIndex + 1}`}</CardTitle>
+                    {currentLesson && (
+                      <CardDescription>
+                        {currentLesson.title} • Блок {currentBlockIndex + 1} из {currentLesson.blocks?.length || 0}
+                      </CardDescription>
+                    )}
                   </div>
+                  {timeLeft !== null && (
+                    <Badge variant="destructive" className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
-              <CardContent>
-                {currentBlock.type === "text" && (() => {
-                  // Получаем HTML контент из редактора
-                  let htmlContent = currentBlock.content?.text || ""
-                  
-                  console.log('Текстовый блок, исходный контент:', htmlContent?.substring(0, 200))
-                  console.log('Тип контента:', typeof htmlContent)
-                  
-                  if (!htmlContent) {
-                    return <p className="text-muted-foreground">Нет содержимого</p>
-                  }
-                  
-                  // Убеждаемся, что это строка
-                  if (typeof htmlContent !== 'string') {
-                    htmlContent = String(htmlContent)
-                  }
-                  
-                  // Разэкранируем HTML если он был экранирован
-                  // ВАЖНО: сначала заменяем двойные экранирования, затем одинарные
-                  // Обрабатываем в правильном порядке, чтобы не сломать другие сущности
-                  htmlContent = htmlContent
-                    // Сначала обрабатываем двойные экранирования
-                    .replace(/&amp;lt;/g, '<')
-                    .replace(/&amp;gt;/g, '>')
-                    .replace(/&amp;quot;/g, '"')
-                    .replace(/&amp;#39;/g, "'")
-                    .replace(/&amp;#x27;/g, "'")
-                    .replace(/&amp;#x2F;/g, '/')
-                    // Затем обрабатываем одинарные экранирования
-                    .replace(/&lt;/g, '<')
-                    .replace(/&gt;/g, '>')
-                    .replace(/&quot;/g, '"')
-                    .replace(/&#39;/g, "'")
-                    .replace(/&#x27;/g, "'")
-                    .replace(/&#x2F;/g, '/')
-                    // В последнюю очередь заменяем оставшиеся &amp;
-                    .replace(/&amp;/g, '&')
-                  
-                  // Обрабатываем изображения: если путь относительный, добавляем /api/files/
-                  htmlContent = htmlContent.replace(
-                    /<img([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
-                    (match: string, before: string, src: string, after: string) => {
-                      console.log('Обработка изображения, src:', src?.substring(0, 100))
-                      // Если это не полный URL (http/https) и не начинается с /api/files/, добавляем /api/files/
-                      if (!src.startsWith('http') && !src.startsWith('/api/files/') && !src.startsWith('data:') && !src.startsWith('//')) {
-                        // Проверяем, не начинается ли путь с /, если нет - добавляем /api/files/
-                        const newSrc = src.startsWith('/') ? `/api/files${src}` : `/api/files/${src}`
-                        return `<img${before}src="${newSrc}"${after} style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0; display: block;">`
-                      }
-                      return `<img${before}src="${src}"${after} style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0; display: block;">`
-                    }
-                  )
-                  
-                  // Обрабатываем видео: если путь относительный, добавляем /api/files/
-                  htmlContent = htmlContent.replace(
-                    /<video([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
-                    (match: string, before: string, src: string, after: string) => {
-                      console.log('Обработка видео, src:', src?.substring(0, 100))
-                      // Если это не полный URL (http/https) и не начинается с /api/files/, добавляем /api/files/
-                      if (!src.startsWith('http') && !src.startsWith('/api/files/') && !src.startsWith('data:') && !src.startsWith('//')) {
-                        const newSrc = src.startsWith('/') ? `/api/files${src}` : `/api/files/${src}`
-                        return `<video${before}src="${newSrc}"${after} controls style="max-width: 100%; border-radius: 8px; margin: 16px 0; display: block;"></video>`
-                      }
-                      return `<video${before}src="${src}"${after} controls style="max-width: 100%; border-radius: 8px; margin: 16px 0; display: block;"></video>`
-                    }
-                  )
-                  
-                  // Обрабатываем iframe (для YouTube, Vimeo и т.д.)
-                  htmlContent = htmlContent.replace(
-                    /<iframe([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
-                    (match: string, before: string, src: string, after: string) => {
-                      console.log('Обработка iframe, src:', src?.substring(0, 100))
-                      // iframe обычно уже содержит полный URL для YouTube/Vimeo
-                      // Проверяем, нужно ли добавить атрибуты для правильного отображения
-                      const hasAllow = before.includes('allow=') || after.includes('allow=')
-                      const hasStyle = before.includes('style=') || after.includes('style=')
+              <CardContent className="space-y-6">
+                {currentBlock.type === "text" && (
+                  <div className="prose max-w-none">
+                    {currentBlock.content?.text && (() => {
+                      let htmlContent = currentBlock.content.text
                       
-                      let iframeAttrs = before + after
-                      if (!hasAllow) {
-                        iframeAttrs = before + ' allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen' + after
-                      }
-                      if (!hasStyle) {
-                        iframeAttrs = iframeAttrs.replace(/(allowfullscreen)?$/, ' style="max-width: 100%; width: 100%; aspect-ratio: 16/9; border-radius: 8px; margin: 16px 0; display: block;" allowfullscreen')
-                      }
+                      // Обрабатываем двойные экранирования HTML
+                      htmlContent = htmlContent
+                        .replace(/&amp;lt;/g, '<')
+                        .replace(/&amp;gt;/g, '>')
+                        .replace(/&amp;quot;/g, '"')
+                        .replace(/&amp;#39;/g, "'")
+                        .replace(/&amp;#x27;/g, "'")
+                        .replace(/&amp;#x2F;/g, '/')
+                        // Затем обрабатываем одинарные экранирования
+                        .replace(/&lt;/g, '<')
+                        .replace(/&gt;/g, '>')
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#39;/g, "'")
+                        .replace(/&#x27;/g, "'")
+                        .replace(/&#x2F;/g, '/')
+                        // В последнюю очередь заменяем оставшиеся &amp;
+                        .replace(/&amp;/g, '&')
                       
-                      return `<iframe${iframeAttrs}src="${src}"></iframe>`
-                    }
-                  )
-                  
-                  console.log('Обработанный HTML:', htmlContent?.substring(0, 200))
-                  
-                  return (
-                    <div 
-                      className="prose max-w-none"
-                      dangerouslySetInnerHTML={{ __html: htmlContent }}
-                      style={{
-                        // Убеждаемся, что видео и iframe отображаются правильно
-                        '--tw-prose-video': 'inherit',
-                      } as React.CSSProperties}
-                    />
-                  )
-                })()}
+                      // Обрабатываем изображения: если путь относительный, добавляем /api/files/
+                      htmlContent = htmlContent.replace(
+                        /<img([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
+                        (match: string, before: string, src: string, after: string) => {
+                          console.log('Обработка изображения, src:', src?.substring(0, 100))
+                          // Если это не полный URL (http/https) и не начинается с /api/files/, добавляем /api/files/
+                          if (!src.startsWith('http') && !src.startsWith('/api/files/') && !src.startsWith('data:') && !src.startsWith('//')) {
+                            // Проверяем, не начинается ли путь с /, если нет - добавляем /api/files/
+                            const newSrc = src.startsWith('/') ? `/api/files${src}` : `/api/files/${src}`
+                            return `<img${before}src="${newSrc}"${after} style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0; display: block;">`
+                          }
+                          return `<img${before}src="${src}"${after} style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0; display: block;">`
+                        }
+                      )
+                      
+                      // Обрабатываем видео: если путь относительный, добавляем /api/files/
+                      htmlContent = htmlContent.replace(
+                        /<video([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
+                        (match: string, before: string, src: string, after: string) => {
+                          console.log('Обработка видео, src:', src?.substring(0, 100))
+                          // Если это не полный URL (http/https) и не начинается с /api/files/, добавляем /api/files/
+                          if (!src.startsWith('http') && !src.startsWith('/api/files/') && !src.startsWith('data:') && !src.startsWith('//')) {
+                            const newSrc = src.startsWith('/') ? `/api/files${src}` : `/api/files/${src}`
+                            return `<video${before}src="${newSrc}"${after} controls style="max-width: 100%; border-radius: 8px; margin: 16px 0; display: block;"></video>`
+                          }
+                          return `<video${before}src="${src}"${after} controls style="max-width: 100%; border-radius: 8px; margin: 16px 0; display: block;"></video>`
+                        }
+                      )
+                      
+                      // Обрабатываем iframe (для YouTube, Vimeo и т.д.)
+                      htmlContent = htmlContent.replace(
+                        /<iframe([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
+                        (match: string, before: string, src: string, after: string) => {
+                          console.log('Обработка iframe, src:', src?.substring(0, 100))
+                          // iframe обычно уже содержит полный URL для YouTube/Vimeo
+                          // Проверяем, нужно ли добавить атрибуты для правильного отображения
+                          const hasAllow = before.includes('allow=') || after.includes('allow=')
+                          const hasStyle = before.includes('style=') || after.includes('style=')
+                          
+                          let iframeAttrs = before + after
+                          if (!hasAllow) {
+                            iframeAttrs = before + ' allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen' + after
+                          }
+                          if (!hasStyle) {
+                            iframeAttrs = iframeAttrs.replace(/(allowfullscreen)?$/, ' style="max-width: 100%; width: 100%; aspect-ratio: 16/9; border-radius: 8px; margin: 16px 0; display: block;" allowfullscreen')
+                          }
+                          
+                          return `<iframe${iframeAttrs}src="${src}"></iframe>`
+                        }
+                      )
+                      
+                      console.log('Обработанный HTML:', htmlContent?.substring(0, 200))
+                      
+                      return (
+                        <div 
+                          className="prose max-w-none"
+                          dangerouslySetInnerHTML={{ __html: htmlContent }}
+                          style={{
+                            // Убеждаемся, что видео и iframe отображаются правильно
+                            '--tw-prose-video': 'inherit',
+                          } as React.CSSProperties}
+                        />
+                      )
+                    })()}
+                  </div>
+                )}
 
                 {currentBlock.type === "video" && (
                   <div className="aspect-video bg-muted rounded-lg overflow-hidden">
@@ -800,9 +664,9 @@ export default function CoursePlayerPage() {
                             embedUrl = `https://rutube.ru/play/embed/${videoIdMatch[1]}`
                           }
                         } else if (url.includes('vimeo.com/')) {
-                          const videoId = url.split('vimeo.com/')[1]?.split('?')[0]
-                          if (videoId) {
-                            embedUrl = `https://player.vimeo.com/video/${videoId}`
+                          const videoIdMatch = url.match(/vimeo\.com\/(\d+)/)
+                          if (videoIdMatch && videoIdMatch[1]) {
+                            embedUrl = `https://player.vimeo.com/video/${videoIdMatch[1]}`
                           }
                         }
                         
@@ -810,84 +674,25 @@ export default function CoursePlayerPage() {
                           <iframe
                             src={embedUrl}
                             className="w-full h-full"
-                            frameBorder="0"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
-                            title={currentBlock.title || "Видео"}
+                            style={{ aspectRatio: '16/9' }}
+                          />
+                        )
+                      } else {
+                        // Локальное видео или прямой URL
+                        const videoUrl = url.startsWith('http') ? url : `/api/files/${url}`
+                        return (
+                          <VideoPlayerEnhanced
+                            src={videoUrl}
+                            controls
+                            className="w-full h-full"
                           />
                         )
                       }
-                      
-                      // Для локальных файлов используем улучшенный видео плеер
-                      const videoUrl = url.startsWith('/') || url.startsWith('http') 
-                        ? url 
-                        : `/api/files/${url}`
-                      
-                      return (
-                        <VideoPlayerEnhanced
-                          src={videoUrl}
-                          title={currentBlock.title}
-                          autoPlay={false}
-                          loop={false}
-                          controls={true}
-                          className="w-full h-full"
-                          key={`video-${currentBlock.id}-${currentBlockIndex}`} // Добавляем key для пересоздания компонента при смене блока
-                        />
-                      )
                     })() : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="text-center">
-                          <Play className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                          <p className="text-muted-foreground">Видео не загружено</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {currentBlock.type === "audio" && (
-                  <div className="bg-muted rounded-lg p-6">
-                    {currentBlock.content?.url ? (
-                      <audio
-                        src={currentBlock.content.url.startsWith('/') || currentBlock.content.url.startsWith('http')
-                          ? currentBlock.content.url
-                          : `/api/files/${currentBlock.content.url}`}
-                        controls
-                        className="w-full"
-                      >
-                        Ваш браузер не поддерживает аудио.
-                      </audio>
-                    ) : (
-                      <div className="text-center">
-                        <Volume2 className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-muted-foreground">Аудио не загружено</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {currentBlock.type === "image" && (
-                  <div className="space-y-4">
-                    {currentBlock.content?.url ? (
-                      <div className="bg-muted rounded-lg p-4">
-                        <img 
-                          src={currentBlock.content.url.startsWith('/') || currentBlock.content.url.startsWith('http')
-                            ? currentBlock.content.url
-                            : `/api/files/${currentBlock.content.url}`} 
-                          alt={currentBlock.content?.caption || currentBlock.title || "Изображение"}
-                          className="max-w-full h-auto rounded-md mx-auto"
-                          style={{ maxHeight: '600px' }}
-                        />
-                        {currentBlock.content?.caption && (
-                          <p className="text-sm text-muted-foreground text-center mt-4 italic">
-                            {currentBlock.content.caption}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 bg-muted rounded-lg">
-                        <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-muted-foreground">Изображение не загружено</p>
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        Видео не загружено
                       </div>
                     )}
                   </div>
@@ -895,21 +700,15 @@ export default function CoursePlayerPage() {
 
                 {currentBlock.type === "quiz" && (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-lg font-medium">{currentBlock.content?.question || "Вопрос теста"}</p>
-                      <div className="flex items-center gap-2">
-                        {currentBlock.content?.points && (
-                          <Badge variant="outline">
-                            {currentBlock.content.points} балл{currentBlock.content.points > 1 ? "ов" : ""}
-                          </Badge>
-                        )}
-                        {timeLeft !== null && timeLeft > 0 && (
-                          <Badge variant={timeLeft < 10 ? "destructive" : "default"}>
-                            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                          </Badge>
-                        )}
-                      </div>
+                    <div className="text-lg font-semibold">
+                      {currentBlock.content?.question || currentBlock.title}
                     </div>
+                    
+                    {currentBlock.content?.description && (
+                      <div className="text-sm text-muted-foreground">
+                        {currentBlock.content.description}
+                      </div>
+                    )}
                     
                     {currentBlock.content?.questionType === "single" && (
                       <RadioGroup
@@ -942,7 +741,7 @@ export default function CoursePlayerPage() {
                             <Checkbox
                               id={answer.id}
                               checked={(answers[currentBlock.id] || []).includes(answer.id)}
-                              onCheckedChange={(checked) => {
+                              onCheckedChange={async (checked) => {
                                 const currentAnswers = answers[currentBlock.id] || []
                                 const newAnswers = checked
                                   ? [...currentAnswers, answer.id]
@@ -1080,6 +879,10 @@ export default function CoursePlayerPage() {
                               setAnswers({ ...answers, [currentBlock.id]: url })
                               await saveAnswer(currentBlock.id, url)
                             }}
+                            onError={(error) => {
+                              console.error('MediaRecorder error in quiz:', error)
+                              toast.error(`Ошибка записи видео: ${error.message}`)
+                            }}
                           />
                         )}
                       </div>
@@ -1090,39 +893,25 @@ export default function CoursePlayerPage() {
                 {currentBlock.type === "sequence" && (
                       <div className="space-y-4">
                         <p className="text-lg font-medium">{currentBlock.content?.instruction || "Расставьте элементы в правильном порядке"}</p>
-                        <SequenceOrderBlock
-                          items={currentBlock.content?.items || []}
-                          correctOrder={currentBlock.content?.correctOrder || []}
-                          onAnswerChange={(order) => {
-                            setAnswers({ ...answers, [currentBlock.id]: order })
-                            saveAnswer(currentBlock.id, order)
-                          }}
-                          userAnswer={answers[currentBlock.id]}
-                        />
-                      </div>
-                    )}
-
-                    {currentBlock.type === "file-upload" && (
-                      <div className="space-y-4">
-                        <p className="text-lg font-medium">{currentBlock.content?.instruction || "Загрузите файл"}</p>
-                        <FileUploadBlock
-                          allowedTypes={currentBlock.content?.allowedTypes || ["document"]}
-                          maxSize={currentBlock.content?.maxSize || 10}
-                          onFileUpload={(fileUrl) => {
-                            setAnswers({ ...answers, [currentBlock.id]: fileUrl })
-                            saveAnswer(currentBlock.id, fileUrl)
-                          }}
-                          uploadedFile={answers[currentBlock.id]}
-                        />
+                        <div className="space-y-2">
+                          {currentBlock.content?.items?.map((item: any, index: number) => (
+                            <div
+                              key={item.id || index}
+                              className="p-4 border rounded-md bg-muted/50 cursor-move"
+                              draggable
+                            >
+                              {item.text || item.title || `Элемент ${index + 1}`}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
               </CardContent>
             </Card>
           </motion.div>
-        )}
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between">
+          {/* Навигация */}
+          <div className="flex items-center justify-between">
           <Button
             variant="outline"
             onClick={handlePrevious}
@@ -1152,8 +941,6 @@ export default function CoursePlayerPage() {
           </div>
         </div>
       </div>
-    </div>
     </ContentProtection>
   )
 }
-

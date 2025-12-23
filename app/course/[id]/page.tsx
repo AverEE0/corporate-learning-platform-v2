@@ -136,19 +136,30 @@ export default function CoursePlayerPage() {
   }
 
   // Мемоизируем currentLesson и currentBlock, чтобы избежать бесконечных перерендеров
+  // Используем стабильные идентификаторы вместо объектов
   const currentLesson = useMemo(() => {
-    if (!course?.lessons || !course.lessons[currentLessonIndex]) return undefined
-    return course.lessons[currentLessonIndex]
-  }, [course, currentLessonIndex])
+    if (!course?.lessons || !Array.isArray(course.lessons) || currentLessonIndex >= course.lessons.length) return undefined
+    const lesson = course.lessons[currentLessonIndex]
+    // Защита от циклических ссылок - возвращаем только примитивные значения
+    if (!lesson || typeof lesson !== 'object') return undefined
+    return lesson
+  }, [course?.id, course?.lessons?.length, currentLessonIndex]) // Используем стабильные зависимости
 
   const currentBlock = useMemo(() => {
-    if (!currentLesson?.blocks || !currentLesson.blocks[currentBlockIndex]) return undefined
-    return currentLesson.blocks[currentBlockIndex]
-  }, [currentLesson, currentBlockIndex])
+    if (!currentLesson?.blocks || !Array.isArray(currentLesson.blocks) || currentBlockIndex >= currentLesson.blocks.length) return undefined
+    const block = currentLesson.blocks[currentBlockIndex]
+    // Защита от циклических ссылок
+    if (!block || typeof block !== 'object') return undefined
+    return block
+  }, [currentLesson?.id, currentLesson?.blocks?.length, currentBlockIndex]) // Используем стабильные зависимости
 
   const totalBlocks = useMemo(() => {
-    return course?.lessons.reduce((sum, l) => sum + (l.blocks?.length || 0), 0) || 0
-  }, [course?.lessons])
+    if (!course?.lessons || !Array.isArray(course.lessons)) return 0
+    return course.lessons.reduce((sum, l) => {
+      if (!l || !Array.isArray(l.blocks)) return sum
+      return sum + l.blocks.length
+    }, 0)
+  }, [course?.id, course?.lessons?.length]) // Используем стабильные зависимости
 
   const completedBlocks = useMemo(() => {
     return Math.floor((progress / 100) * totalBlocks)
@@ -370,16 +381,20 @@ export default function CoursePlayerPage() {
 
   useEffect(() => {
     // Используем currentBlockIndex и currentLessonIndex для проверки, а не сам currentBlock
-    if (!course || currentLessonIndex >= (course.lessons?.length || 0)) return
-    if (!currentLesson || currentBlockIndex >= (currentLesson.blocks?.length || 0)) return
+    if (!course || !Array.isArray(course.lessons) || currentLessonIndex >= course.lessons.length) return
+    
+    const lesson = course.lessons[currentLessonIndex]
+    if (!lesson || !Array.isArray(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) return
 
     // Используем setTimeout для отложенного сохранения, чтобы избежать рекурсии
     const saveTimeout = setTimeout(() => {
-      saveProgress()
+      if (saveProgress) {
+        saveProgress()
+      }
     }, 100)
     
     // Получаем тип блока напрямую из данных, чтобы избежать пересчета
-    const block = currentLesson.blocks?.[currentBlockIndex]
+    const block = lesson.blocks[currentBlockIndex]
     
     // Устанавливаем таймер для ограничения времени на ответ
     if (block?.type === "quiz" && block.content?.timeLimit) {
@@ -407,7 +422,7 @@ export default function CoursePlayerPage() {
     }
     
     return () => clearTimeout(saveTimeout)
-  }, [currentBlockIndex, currentLessonIndex, course?.id, currentLesson?.id]) // Используем стабильные идентификаторы
+  }, [currentBlockIndex, currentLessonIndex, course?.id]) // Используем только стабильные идентификаторы
 
   if (loading) {
     return (

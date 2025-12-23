@@ -358,7 +358,13 @@ export default function CoursePlayerPage() {
         }),
       })
 
-      setProgress(completionPercentage)
+      // Обновляем прогресс только если он действительно изменился (более чем на 1%)
+      setProgress((prev) => {
+        if (Math.abs(prev - completionPercentage) < 1) {
+          return prev // Не обновляем, если изменение меньше 1%
+        }
+        return completionPercentage
+      })
     } catch (error) {
       console.error('Error saving progress:', error)
     }

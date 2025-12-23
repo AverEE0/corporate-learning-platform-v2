@@ -450,10 +450,11 @@ export default function ManagerDashboardPage() {
                           </Badge>
                         </div>
                       </div>
-                      <div className="flex gap-2 ml-4">
+                      <div className="flex flex-wrap gap-1.5 ml-4 shrink-0">
                         <Button 
                           variant="ghost" 
                           size="icon"
+                          className="h-8 w-8"
                           onClick={() => router.push(`/manager/analytics/course/${course.id}`)}
                           title="Аналитика курса"
                         >
@@ -462,6 +463,7 @@ export default function ManagerDashboardPage() {
                         <Button 
                           variant="ghost" 
                           size="icon"
+                          className="h-8 w-8"
                           onClick={() => router.push(`/manager/courses/${course.id}/review`)}
                           title="Проверить ответы студентов"
                         >
@@ -470,6 +472,7 @@ export default function ManagerDashboardPage() {
                         <Button 
                           variant="ghost" 
                           size="icon"
+                          className="h-8 w-8"
                           onClick={() => router.push(`/course/${course.id}`)}
                           title="Просмотреть курс"
                         >
@@ -478,6 +481,7 @@ export default function ManagerDashboardPage() {
                         <Button 
                           variant="ghost" 
                           size="icon"
+                          className="h-8 w-8"
                           onClick={() => router.push(`/course-builder?courseId=${course.id}`)}
                           title="Редактировать курс"
                         >
@@ -487,13 +491,13 @@ export default function ManagerDashboardPage() {
                           <Button 
                             variant="ghost" 
                             size="icon"
+                            className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
                             onClick={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
                               handlePublishCourse(course.id, course.title)
                             }}
                             title="Опубликовать курс"
-                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
                           >
                             <Send className="h-4 w-4" />
                           </Button>
@@ -501,19 +505,7 @@ export default function ManagerDashboardPage() {
                         <Button 
                           variant="ghost" 
                           size="icon"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleDeleteCourse(course.id, course.title)
-                          }}
-                          title="Удалить курс"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
+                          className="h-8 w-8"
                           onClick={() => router.push(`/course/${course.id}/discussions`)}
                           title="Обсуждения курса"
                         >
@@ -524,10 +516,12 @@ export default function ManagerDashboardPage() {
                           courseId={course.id}
                           variant="ghost"
                           size="icon"
+                          className="h-8 w-8"
                         />
                         <Button 
                           variant="ghost" 
                           size="icon"
+                          className="h-8 w-8"
                           onClick={async () => {
                             try {
                               const response = await fetch(`/api/analytics/export/course/${course.id}?format=excel`)
@@ -553,6 +547,19 @@ export default function ManagerDashboardPage() {
                           title="Экспорт отчета (Excel)"
                         >
                           <Download className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDeleteCourse(course.id, course.title)
+                          }}
+                          title="Удалить курс"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>

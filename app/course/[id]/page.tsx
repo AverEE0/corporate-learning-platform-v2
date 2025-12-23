@@ -206,8 +206,8 @@ export default function CoursePlayerPage() {
       setCurrentBlockIndex(currentBlockIndex - 1)
     } else if (currentLessonIndex > 0) {
       setCurrentLessonIndex(currentLessonIndex - 1)
-      const prevLesson = course?.lessons[currentLessonIndex - 1]
-      setCurrentBlockIndex(prevLesson?.blocks.length ? prevLesson.blocks.length - 1 : 0)
+      const prevLesson = course?.lessons && course.lessons[currentLessonIndex - 1] ? course.lessons[currentLessonIndex - 1] : null
+      setCurrentBlockIndex(prevLesson?.blocks && prevLesson.blocks.length ? prevLesson.blocks.length - 1 : 0)
     }
   }
 

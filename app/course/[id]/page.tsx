@@ -147,45 +147,109 @@ export default function CoursePlayerPage() {
 
   const completedBlocks = Math.floor((progress / 100) * totalBlocks)
 
+  // Используем useRef для отслеживания проверяемых блоков, чтобы избежать рекурсии
+  const checkingBlocksRef = useRef<Set<string | number>>(new Set())
+
   const checkAnswerCorrect = (block: Block): boolean => {
     if (!block || block.type !== "quiz" || !block.content) return true
 
-    const userAnswer = answers[block.id]
-    if (!userAnswer) return false
-
-    const questionType = block.content.questionType
-    const answersList = block.content.answers
-
-    // Защита от циклических ссылок и некорректных данных
-    if (!Array.isArray(answersList) || answersList.length === 0) {
-      return false
+    // Защита от рекурсии - если уже проверяем этот блок, возвращаем true
+    if (checkingBlocksRef.current.has(block.id)) {
+      console.warn('Circular check detected for block', block.id)
+      return true
     }
 
-    // Ограничиваем глубину проверки для безопасности
-    const maxAnswers = 100
-    const safeAnswersList = answersList.slice(0, maxAnswers)
+    checkingBlocksRef.current.add(block.id)
 
-    if (questionType === "single") {
-      // Используем findIndex вместо find для большей безопасности
-      const correctAnswerIndex = safeAnswersList.findIndex((a: any) => a && a.isCorrect === true)
-      if (correctAnswerIndex === -1) return false
-      const correctAnswer = safeAnswersList[correctAnswerIndex]
-      return correctAnswer?.id === userAnswer
+    try {
+      const userAnswer = answers[block.id]
+      if (!userAnswer) {
+        checkingBlocksRef.current.delete(block.id)
+        return false
+      }
+
+      const questionType = block.content.questionType
+      const answersList = block.content.answers
+
+      // Защита от циклических ссылок и некорректных данных
+      // Используем простую проверку типа вместо Array.isArray для безопасности
+      if (!answersList || typeof answersList !== 'object' || !('length' in answersList) || answersList.length === 0) {
+        checkingBlocksRef.current.delete(block.id)
+        return false
+      }
+
+      // Ограничиваем глубину проверки для безопасности
+      const maxAnswers = 100
+      let safeAnswersList: any[]
+      try {
+        // Используем простой цикл вместо slice для безопасности
+        safeAnswersList = []
+        const length = Math.min(answersList.length, maxAnswers)
+        for (let i = 0; i < length; i++) {
+          if (i in answersList) {
+            safeAnswersList.push(answersList[i])
+          }
+        }
+      } catch (e) {
+        checkingBlocksRef.current.delete(block.id)
+        return false
+      }
+
+      if (questionType === "single") {
+        // Используем простой цикл вместо findIndex для безопасности
+        let correctAnswer: any = null
+        for (let i = 0; i < safeAnswersList.length; i++) {
+          const a = safeAnswersList[i]
+          if (a && a.isCorrect === true) {
+            correctAnswer = a
+            break
+          }
+        }
+        if (!correctAnswer) {
+          checkingBlocksRef.current.delete(block.id)
+          return false
+        }
+        const result = correctAnswer?.id === userAnswer
+        checkingBlocksRef.current.delete(block.id)
+        return result
+      }
+
+      if (questionType === "multiple") {
+        const correctAnswers: any[] = []
+        for (let i = 0; i < safeAnswersList.length; i++) {
+          const a = safeAnswersList[i]
+          if (a && a.isCorrect === true && a.id !== undefined && a.id !== null) {
+            correctAnswers.push(a.id)
+          }
+        }
+        
+        // Проверяем, является ли userAnswer массивом безопасным способом
+        let userAnswers: any[]
+        if (userAnswer && typeof userAnswer === 'object' && 'length' in userAnswer) {
+          userAnswers = []
+          for (let i = 0; i < userAnswer.length; i++) {
+            if (i in userAnswer) {
+              userAnswers.push(userAnswer[i])
+            }
+          }
+        } else {
+          userAnswers = [userAnswer]
+        }
+        
+        const result = correctAnswers.length === userAnswers.length && 
+               correctAnswers.every((id: string) => userAnswers.includes(id))
+        checkingBlocksRef.current.delete(block.id)
+        return result
+      }
+
+      // Для текстовых, аудио, видео ответов всегда считаем правильными (проверяет менеджер)
+      checkingBlocksRef.current.delete(block.id)
+      return true
+    } catch (error) {
+      console.error('Error in checkAnswerCorrect:', error)
+      checkingBlocksRef.current.delete(block.id)
+      return true // В случае ошибки считаем правильным, чтобы не блокировать
     }
-
-    if (questionType === "multiple") {
-      const correctAnswers = safeAnswersList
-        .filter((a: any) => a && a.isCorrect === true)
-        .map((a: any) => a.id)
-        .filter((id: any) => id !== undefined && id !== null)
-      
-      const userAnswers = Array.isArray(userAnswer) ? userAnswer : [userAnswer]
-      return correctAnswers.length === userAnswers.length && 
-             correctAnswers.every((id: string) => userAnswers.includes(id))
-    }
-
-    // Для текстовых, аудио, видео ответов всегда считаем правильными (проверяет менеджер)
-    return true
   }
 
   const handleBranching = (isCorrect: boolean) => {
@@ -850,9 +914,14 @@ export default function CoursePlayerPage() {
                     {currentBlock.content?.questionType === "single" && (
                       <RadioGroup
                         value={answers[currentBlock.id]?.toString() || ""}
-                        onValueChange={(value) => {
-                          setAnswers({ ...answers, [currentBlock.id]: value })
-                          saveAnswer(currentBlock.id, value)
+                        onValueChange={async (value) => {
+                          const newAnswers = { ...answers, [currentBlock.id]: value }
+                          setAnswers(newAnswers)
+                          await saveAnswer(currentBlock.id, value)
+                          // Автоматически переходим к следующему блоку после выбора ответа (только для single choice)
+                          setTimeout(() => {
+                            handleNext()
+                          }, 500) // Небольшая задержка для сохранения ответа
                         }}
                       >
                         {currentBlock.content?.answers?.map((answer: any) => (
@@ -891,7 +960,7 @@ export default function CoursePlayerPage() {
                     )}
 
                     {currentBlock.content?.questionType === "text" && (
-                      <div className="space-y-2">
+                      <div className="space-y-4">
                         <Textarea
                           value={answers[currentBlock.id] || ""}
                           onChange={(e) => {
@@ -901,6 +970,13 @@ export default function CoursePlayerPage() {
                           placeholder="Введите ваш ответ..."
                           className="min-h-[120px]"
                         />
+                        <Button
+                          onClick={handleNext}
+                          disabled={!answers[currentBlock.id] || answers[currentBlock.id].trim() === ""}
+                          className="w-full"
+                        >
+                          Далее
+                        </Button>
                       </div>
                     )}
 

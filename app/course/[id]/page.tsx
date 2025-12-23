@@ -735,26 +735,35 @@ export default function CoursePlayerPage() {
                     )}
 
                     {currentBlock.content?.questionType === "multiple" && (
-                      <div className="space-y-2">
-                        {currentBlock.content?.answers?.map((answer: any) => (
-                          <div key={answer.id} className="flex items-center space-x-2 p-3 border rounded-md hover:bg-muted/50">
-                            <Checkbox
-                              id={answer.id}
-                              checked={(answers[currentBlock.id] || []).includes(answer.id)}
-                              onCheckedChange={async (checked) => {
-                                const currentAnswers = answers[currentBlock.id] || []
-                                const newAnswers = checked
-                                  ? [...currentAnswers, answer.id]
-                                  : currentAnswers.filter((id: string) => id !== answer.id)
-                                setAnswers({ ...answers, [currentBlock.id]: newAnswers })
-                                saveAnswer(currentBlock.id, newAnswers)
-                              }}
-                            />
-                            <label htmlFor={answer.id} className="flex-1 cursor-pointer">
-                              {answer.text}
-                            </label>
-                          </div>
-                        ))}
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          {currentBlock.content?.answers?.map((answer: any) => (
+                            <div key={answer.id} className="flex items-center space-x-2 p-3 border rounded-md hover:bg-muted/50">
+                              <Checkbox
+                                id={answer.id}
+                                checked={(answers[currentBlock.id] || []).includes(answer.id)}
+                                onCheckedChange={async (checked) => {
+                                  const currentAnswers = answers[currentBlock.id] || []
+                                  const newAnswers = checked
+                                    ? [...currentAnswers, answer.id]
+                                    : currentAnswers.filter((id: string) => id !== answer.id)
+                                  setAnswers({ ...answers, [currentBlock.id]: newAnswers })
+                                  await saveAnswer(currentBlock.id, newAnswers)
+                                }}
+                              />
+                              <label htmlFor={answer.id} className="flex-1 cursor-pointer">
+                                {answer.text}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                        <Button
+                          onClick={handleNext}
+                          disabled={!answers[currentBlock.id] || (Array.isArray(answers[currentBlock.id]) && answers[currentBlock.id].length === 0)}
+                          className="w-full"
+                        >
+                          Далее
+                        </Button>
                       </div>
                     )}
 

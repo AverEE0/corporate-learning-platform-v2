@@ -147,9 +147,8 @@ export default function CoursePlayerPage() {
 
   const completedBlocks = Math.floor((progress / 100) * totalBlocks)
 
-  // Используем useRef для отслеживания проверяемых блоков, чтобы избежать рекурсии
-  const checkingBlocksRef = useRef<Set<string | number>>(new Set())
-
+  // ВРЕМЕННО ОТКЛЮЧЕНО: checkAnswerCorrect вызывает бесконечную рекурсию
+  // Будет переписано позже с полной защитой от рекурсии
   const checkAnswerCorrect = (block: Block): boolean => {
     if (!block || block.type !== "quiz" || !block.content) return true
 

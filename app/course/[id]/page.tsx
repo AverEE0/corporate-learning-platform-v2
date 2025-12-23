@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -16,6 +16,7 @@ import MediaRecorder from "@/components/media-recorder"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import VideoPlayerEnhanced from "@/components/video-player-enhanced"
+import { CourseSidebar } from "@/components/course-sidebar"
 
 interface Block {
   id: string | number
@@ -997,6 +998,7 @@ export default function CoursePlayerPage() {
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
+            </div>
           </div>
         </div>
       </div>

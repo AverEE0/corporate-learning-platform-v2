@@ -1136,7 +1136,7 @@ export default function CoursePlayerPage() {
           </Button>
 
           <div className="text-sm text-muted-foreground">
-            Блок {currentBlockIndex + 1} из {currentLesson?.blocks.length} • 
+            Блок {currentBlockIndex + 1} из {currentLesson?.blocks?.length || 0} • 
             Время: {Math.floor(timeSpent / 60)}:{(timeSpent % 60).toString().padStart(2, '0')}
           </div>
 

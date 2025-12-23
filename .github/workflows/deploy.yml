@@ -10,7 +10,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # Уменьшено до 10 минут - если деплой не завершился, значит проблема
+    timeout-minutes: 12  # Увеличено до 12 минут для пересборки без кеша
     concurrency:
       group: deploy
       cancel-in-progress: false  # Не отменять текущий деплой, если запущен новый

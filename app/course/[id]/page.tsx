@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -135,35 +135,17 @@ export default function CoursePlayerPage() {
     }
   }
 
-  // Мемоизируем currentLesson и currentBlock, чтобы избежать бесконечных перерендеров
-  // Используем стабильные идентификаторы вместо объектов
-  const currentLesson = useMemo(() => {
-    if (!course?.lessons || !Array.isArray(course.lessons) || currentLessonIndex >= course.lessons.length) return undefined
-    const lesson = course.lessons[currentLessonIndex]
-    // Защита от циклических ссылок - возвращаем только примитивные значения
-    if (!lesson || typeof lesson !== 'object') return undefined
-    return lesson
-  }, [course?.id, course?.lessons?.length, currentLessonIndex]) // Используем стабильные зависимости
+  // Вычисляем напрямую без useMemo, чтобы избежать рекурсии
+  const currentLesson = course?.lessons?.[currentLessonIndex]
+  const currentBlock = currentLesson?.blocks?.[currentBlockIndex]
 
-  const currentBlock = useMemo(() => {
-    if (!currentLesson?.blocks || !Array.isArray(currentLesson.blocks) || currentBlockIndex >= currentLesson.blocks.length) return undefined
-    const block = currentLesson.blocks[currentBlockIndex]
-    // Защита от циклических ссылок
-    if (!block || typeof block !== 'object') return undefined
-    return block
-  }, [currentLesson?.id, currentLesson?.blocks?.length, currentBlockIndex]) // Используем стабильные зависимости
+  // Вычисляем напрямую без useMemo
+  const totalBlocks = course?.lessons?.reduce((sum, l) => {
+    if (!l || !Array.isArray(l.blocks)) return sum
+    return sum + l.blocks.length
+  }, 0) || 0
 
-  const totalBlocks = useMemo(() => {
-    if (!course?.lessons || !Array.isArray(course.lessons)) return 0
-    return course.lessons.reduce((sum, l) => {
-      if (!l || !Array.isArray(l.blocks)) return sum
-      return sum + l.blocks.length
-    }, 0)
-  }, [course?.id, course?.lessons?.length]) // Используем стабильные зависимости
-
-  const completedBlocks = useMemo(() => {
-    return Math.floor((progress / 100) * totalBlocks)
-  }, [progress, totalBlocks])
+  const completedBlocks = Math.floor((progress / 100) * totalBlocks)
 
   const checkAnswerCorrect = (block: Block): boolean => {
     if (!block || block.type !== "quiz" || !block.content) return true
@@ -330,12 +312,24 @@ export default function CoursePlayerPage() {
     }
   }
 
+  // Используем useRef для хранения последних значений, чтобы избежать рекурсии
+  const answersRef = useRef(answers)
+  const courseRef = useRef(course)
+  
+  useEffect(() => {
+    answersRef.current = answers
+    courseRef.current = course
+  }, [answers, course])
+
   // Используем useCallback для стабильной ссылки на функцию
   const saveProgress = useCallback(async () => {
-    if (!course || !user) return
+    const currentCourse = courseRef.current
+    const currentAnswers = answersRef.current
+    
+    if (!currentCourse || !user) return
 
     // Получаем данные напрямую из course, а не из мемоизированных значений
-    const lessons = course.lessons || []
+    const lessons = currentCourse.lessons || []
     if (currentLessonIndex >= lessons.length) return
     
     const lesson = lessons[currentLessonIndex]
@@ -354,13 +348,13 @@ export default function CoursePlayerPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          courseId: course.id,
+          courseId: currentCourse.id,
           lessonId: lesson.id,
           blockId: blocks[currentBlockIndex]?.id,
           completionPercentage,
           timeSpent,
           completed: false,
-          answers: answers,
+          answers: currentAnswers,
         }),
       })
 
@@ -368,7 +362,7 @@ export default function CoursePlayerPage() {
     } catch (error) {
       console.error('Error saving progress:', error)
     }
-  }, [course?.id, currentLessonIndex, currentBlockIndex, timeSpent, user?.id, answers]) // Стабильные зависимости
+  }, [currentLessonIndex, currentBlockIndex, timeSpent, user?.id]) // Только примитивные зависимости
 
   const saveAnswer = async (blockId: string | number, answer: any) => {
     if (!course || !user) return

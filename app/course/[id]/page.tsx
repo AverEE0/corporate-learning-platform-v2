@@ -314,11 +314,12 @@ export default function CoursePlayerPage() {
     if (!currentLesson) return
 
     // Проверяем ветвление для тестов
-    if (currentBlock?.type === "quiz" && currentBlock.content?.branching) {
-      const isCorrect = checkAnswerCorrect(currentBlock)
-      handleBranching(isCorrect)
-      return
-    }
+    // Временно отключаем проверку правильности ответа, чтобы избежать рекурсии
+    // if (currentBlock?.type === "quiz" && currentBlock.content?.branching) {
+    //   const isCorrect = checkAnswerCorrect(currentBlock)
+    //   handleBranching(isCorrect)
+    //   return
+    // }
 
     if (currentBlockIndex < currentLesson.blocks.length - 1) {
       setCurrentBlockIndex(currentBlockIndex + 1)

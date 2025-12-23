@@ -505,6 +505,48 @@ export default function CoursePlayerPage() {
     )
   }
 
+  // Вычисляем прогресс по урокам для боковой панели
+  // Используем useMemo с правильными зависимостями для обновления при изменении answers
+  const lessonProgress = useMemo(() => {
+    if (!course?.lessons) return {}
+    const progressMap: Record<number, number> = {}
+    
+    course.lessons.forEach((lesson) => {
+      if (!lesson || !lesson.blocks || lesson.blocks.length === 0) {
+        progressMap[lesson.id] = 0
+        return
+      }
+      
+      // Подсчитываем пройденные блоки
+      let completedCount = 0
+      for (let i = 0; i < lesson.blocks.length; i++) {
+        const block = lesson.blocks[i]
+        if (block && block.id !== undefined) {
+          const answer = answers[block.id]
+          if (answer !== undefined && answer !== null && answer !== "" && 
+              !(Array.isArray(answer) && answer.length === 0)) {
+            completedCount++
+          }
+        }
+      }
+      
+      progressMap[lesson.id] = Math.round((completedCount / lesson.blocks.length) * 100)
+    })
+    
+    return progressMap
+  }, [course?.lessons, answers]) // Явно указываем зависимости для обновления
+
+  // Создаем ключ для принудительного обновления боковой панели при изменении ответов
+  const sidebarKey = useMemo(() => {
+    // Создаем ключ на основе количества пройденных блоков
+    const completedCount = Object.keys(answers).filter(key => {
+      const answer = answers[key]
+      return answer !== undefined && answer !== null && answer !== "" && 
+             !(Array.isArray(answer) && answer.length === 0)
+    }).length
+    return `sidebar-${completedCount}-${currentLessonIndex}-${currentBlockIndex}`
+  }, [answers, currentLessonIndex, currentBlockIndex])
+
   return (
     <ContentProtection>
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -538,7 +580,7 @@ export default function CoursePlayerPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Боковая панель с содержанием курса */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1" key={sidebarKey}>
               <CourseSidebar
                 lessons={course.lessons?.map((l) => ({
                   id: l.id,

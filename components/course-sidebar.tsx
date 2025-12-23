@@ -42,7 +42,10 @@ export function CourseSidebar({
 
   const isBlockCompleted = (blockId: string | number) => {
     const answer = completedBlocks[blockId]
-    return answer !== undefined && answer !== null && answer !== ""
+    if (answer === undefined || answer === null) return false
+    if (typeof answer === "string" && answer.trim() === "") return false
+    if (Array.isArray(answer) && answer.length === 0) return false
+    return true
   }
 
   return (

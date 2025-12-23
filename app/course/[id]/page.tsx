@@ -104,7 +104,7 @@ export default function CoursePlayerPage() {
     switch (path) {
       case "skip":
         // Пропускаем следующий блок
-        if (currentBlockIndex + 2 < currentLesson.blocks.length) {
+        if (currentLesson.blocks && currentBlockIndex + 2 < currentLesson.blocks.length) {
           setCurrentBlockIndex(currentBlockIndex + 2)
         } else if (currentLessonIndex + 1 < course.lessons.length) {
           setCurrentLessonIndex(currentLessonIndex + 1)
@@ -172,6 +172,9 @@ export default function CoursePlayerPage() {
     const currentLesson = currentCourse.lessons[lessonIndex]
     if (!currentLesson || !currentLesson.blocks) return
     
+    const blocks = currentLesson.blocks
+    if (!isArraySafe(blocks)) return
+    
     isNavigatingRef.current = true
     
     // Временно отключена проверка ветвления, чтобы избежать рекурсии
@@ -181,7 +184,7 @@ export default function CoursePlayerPage() {
     //   return
     // }
 
-    if (blockIndex < currentLesson.blocks.length - 1) {
+    if (blockIndex < blocks.length - 1) {
       setCurrentBlockIndex(blockIndex + 1)
     } else if (lessonIndex < currentCourse.lessons.length - 1) {
       setCurrentLessonIndex(lessonIndex + 1)

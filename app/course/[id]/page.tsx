@@ -267,10 +267,10 @@ export default function CoursePlayerPage() {
     if (currentLessonIndex >= lessons.length) return
     
     const lesson = lessons[currentLessonIndex]
-    if (!lesson || !isArraySafe(lesson.blocks)) return
+    if (!lesson || !lesson.blocks || !isArraySafe(lesson.blocks)) return
     
     const blocks = lesson.blocks
-    const blocksCount = blocks.length || 1
+    const blocksCount = blocks && blocks.length ? blocks.length : 1
 
     const completionPercentage = Math.round(
       ((currentLessonIndex * 100 + (currentBlockIndex + 1) * (100 / blocksCount)) / 

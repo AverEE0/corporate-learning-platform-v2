@@ -68,11 +68,29 @@ export function SortableList<T extends { id: string | number }>({ items, onReord
     const { active, over } = event
 
     if (active.id !== over.id) {
-      const oldIndex = items.findIndex((item) => String(item.id) === String(active.id))
-      const newIndex = items.findIndex((item) => String(item.id) === String(over.id))
+      // Используем простой цикл вместо findIndex для избежания рекурсии
+      let oldIndex = -1
+      let newIndex = -1
+      
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (!item) continue
+        
+        if (String(item.id) === String(active.id)) {
+          oldIndex = i
+        }
+        if (String(item.id) === String(over.id)) {
+          newIndex = i
+        }
+        
+        // Прерываем цикл, если оба индекса найдены
+        if (oldIndex >= 0 && newIndex >= 0) break
+      }
 
-      const newItems = arrayMove(items, oldIndex, newIndex)
-      onReorder(newItems)
+      if (oldIndex >= 0 && newIndex >= 0) {
+        const newItems = arrayMove(items, oldIndex, newIndex)
+        onReorder(newItems)
+      }
     }
   }
 

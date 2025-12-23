@@ -27,7 +27,25 @@ export function SequenceOrderBlock({
 
   const handleReorder = (newItems: typeof items) => {
     setCurrentOrder(newItems)
-    const newOrder = newItems.map((item) => items.findIndex((i) => i.id === item.id))
+    // Используем простой цикл вместо findIndex для избежания рекурсии
+    const newOrder: number[] = []
+    for (let i = 0; i < newItems.length; i++) {
+      const item = newItems[i]
+      if (!item || !item.id) continue
+      
+      // Ищем индекс в оригинальном массиве через простой цикл
+      let foundIndex = -1
+      for (let j = 0; j < items.length; j++) {
+        if (items[j] && items[j].id === item.id) {
+          foundIndex = j
+          break
+        }
+      }
+      
+      if (foundIndex >= 0) {
+        newOrder.push(foundIndex)
+      }
+    }
     onAnswerChange(newOrder)
   }
 

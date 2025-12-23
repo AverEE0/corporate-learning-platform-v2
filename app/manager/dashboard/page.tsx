@@ -434,8 +434,8 @@ export default function ManagerDashboardPage() {
                     transition={{ duration: 0.3, delay: index * 0.1 }}
                     className="p-4 border rounded-lg hover:border-primary/50 transition-colors"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
                         <h4 className="font-semibold mb-1">{course.title}</h4>
                         <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                           {course.description || "Без описания"}

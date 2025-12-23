@@ -346,7 +346,7 @@ export default function CoursePlayerPage() {
 
   // Используем отдельный useEffect для таймера, чтобы избежать рекурсии
   useEffect(() => {
-    if (!course || !isArraySafe(course.lessons) || currentLessonIndex >= course.lessons.length) {
+    if (!course || !course.lessons || !isArraySafe(course.lessons) || currentLessonIndex >= course.lessons.length) {
       setTimeLeft(null)
       return
     }

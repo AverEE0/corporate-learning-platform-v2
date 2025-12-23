@@ -131,9 +131,10 @@ export default function CoursePlayerPage() {
           // Находим блок по ID (без findIndex, чтобы избежать рекурсии)
           for (let i = 0; i < course.lessons.length; i++) {
             const lesson = course.lessons[i]
-            if (!lesson || !isArraySafe(lesson.blocks)) continue
-            for (let j = 0; j < lesson.blocks.length; j++) {
-              const b = lesson.blocks[j]
+            if (!lesson || !lesson.blocks || !isArraySafe(lesson.blocks)) continue
+            const blocks = lesson.blocks
+            for (let j = 0; j < blocks.length; j++) {
+              const b = blocks[j]
               if (b && (b.id?.toString() === targetBlockId || b.title === targetBlockId)) {
                 setCurrentLessonIndex(i)
                 setCurrentBlockIndex(j)

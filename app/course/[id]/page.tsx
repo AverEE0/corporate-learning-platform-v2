@@ -352,7 +352,7 @@ export default function CoursePlayerPage() {
     }
     
     const lesson = course.lessons[currentLessonIndex]
-    if (!lesson || !isArraySafe(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) {
+    if (!lesson || !lesson.blocks || !isArraySafe(lesson.blocks) || currentBlockIndex >= lesson.blocks.length) {
       setTimeLeft(null)
       return
     }
